@@ -1,7 +1,260 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using MyNotes.Data
+@inject IDbContextFactory<MediaDbContext> DbFactory
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Media Journal</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="shell">
+    <header class="topbar">
+        <div class="brand"><span class="brand-mark">✳</span><span>FRAME<span class="brand-light">NOTES</span></span></div>
+        <span class="topbar-caption">YOUR PERSONAL SCREEN JOURNAL</span>
+    </header>
 
-Welcome to your new app.
+    <main>
+        <section class="hero">
+            <div class="eyebrow">A SPACE FOR WHAT STAYS WITH YOU</div>
+            <h1>Every story leaves<br><em>an impression.</em></h1>
+            <p>Keep your movie reviews and rate each episode as you go. Your notes stay in your own SQL Server database.</p>
+            <button class="button primary" @onclick="StartNew">+ Add a title</button>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="notice error" role="alert">@error <button @onclick="() => error = null">×</button></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="notice success" role="status">@message <button @onclick="() => message = null">×</button></div>
+        }
+
+        <div class="workspace">
+            <aside class="library">
+                <div class="section-heading"><h2>Library <span>@items.Count</span></h2><button class="text-button" @onclick="StartNew">+ New</button></div>
+                <div class="filter-row">
+                    <button class="filter @(filter == "All" ? "active" : "")" @onclick="ShowAll">All</button>
+                    <button class="filter @(filter == "Movies" ? "active" : "")" @onclick="ShowMovies">Movies</button>
+                    <button class="filter @(filter == "Series" ? "active" : "")" @onclick="ShowSeries">Series</button>
+                    <button class="filter @(filter == "Not on IMDb" ? "active" : "")" @onclick="ShowNotOnImdb">Not on IMDb</button>
+                </div>
+                <input class="search" placeholder="Search titles…" @bind="search" @bind:event="oninput" aria-label="Search titles" />
+                <div class="library-list">
+                    @foreach (var item in FilteredItems)
+                    {
+                        <button class="library-item @(selectedId == item.Id ? "selected" : "")" @onclick="() => SelectItem(item.Id)" @key="item.Id">
+                            <span class="item-icon">@(item.Kind == MediaKind.Movie ? "◈" : "▣")</span>
+                            <span class="item-main"><strong>@item.Title</strong><small>@item.Kind · @(item.ReleaseYear?.ToString() ?? "Year unknown") @if (item.SavedToImdb) { <span title="Saved to IMDb"> · IMDb ✓</span> } @if (item.SavedToLetterboxd) { <span title="Saved to Letterboxd"> · Letterboxd ✓</span> }</small></span>
+                            <span class="rating-pill">@(item.Rating?.ToString("0.#") ?? "—")</span>
+                        </button>
+                    }
+                    @if (!FilteredItems.Any())
+                    {
+                        <p class="empty-list">No titles here yet.</p>
+                    }
+                </div>
+            </aside>
+
+            <section class="editor">
+                <div class="section-heading"><h2>@(selectedId is null ? "Add a title" : "Your notes")</h2><span class="micro">RATINGS ARE OUT OF 10</span></div>
+                <EditForm Model="mediaForm" OnValidSubmit="SaveMedia" FormName="media">
+                    <DataAnnotationsValidator />
+                    <div class="form-grid">
+                        <div class="field wide"><label for="media-title">Title</label><InputText id="media-title" @bind-Value="mediaForm.Title" placeholder="e.g. Silo" /><ValidationMessage For="() => mediaForm.Title" /></div>
+                        <div class="field"><label for="media-kind">Type</label><InputSelect id="media-kind" @bind-Value="mediaForm.Kind"><option value="Movie">Movie</option><option value="Series">TV series</option></InputSelect></div>
+                        <div class="field"><label for="media-year">Release year <span>optional</span></label><InputNumber id="media-year" @bind-Value="mediaForm.ReleaseYear" placeholder="2025" /><ValidationMessage For="() => mediaForm.ReleaseYear" /></div>
+                        <div class="field"><label for="media-rating">Overall rating <span>optional</span></label><div class="rating-input"><InputNumber id="media-rating" @bind-Value="mediaForm.Rating" min="0" max="10" step="0.1" placeholder="—" /><span>/ 10</span></div><ValidationMessage For="() => mediaForm.Rating" /></div>
+                        <div class="field wide saved-flags"><label>Also saved on</label><label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToImdb" /> IMDb</label><label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToLetterboxd" /> Letterboxd</label></div>
+                        <div class="field wide"><label for="media-review">Review <span>optional · any language</span></label><InputTextArea id="media-review" @bind-Value="mediaForm.Review" rows="7" placeholder="What did you think?" /></div>
+                    </div>
+                    <div class="form-actions"><button type="submit" class="button primary">@(selectedId is null ? "Save title" : "Save changes")</button>@if (selectedId is not null) { <button type="button" class="button ghost" @onclick="StartNew">New entry</button> }</div>
+                </EditForm>
+
+                @if (selectedId is not null && selectedItem?.Kind == MediaKind.Series)
+                {
+                    <div class="episodes">
+                        <div class="section-heading"><h2>Episodes <span>@selectedItem.Episodes.Count</span></h2><span class="micro">LEAVE RATING EMPTY IF UNWATCHED</span></div>
+                        <div class="episode-list">
+                            @foreach (var episode in selectedItem.Episodes.OrderBy(x => x.SeasonNumber).ThenBy(x => x.EpisodeNumber))
+                            {
+                                <button class="episode-row" @onclick="() => EditEpisode(episode)" @key="episode.Id">
+                                    <span class="episode-number">S@episode.SeasonNumber.ToString("00") · E@episode.EpisodeNumber.ToString("00")</span>
+                                    <span class="episode-title">@(string.IsNullOrWhiteSpace(episode.Title) ? "Episode " + episode.EpisodeNumber : episode.Title)<small>@(string.IsNullOrWhiteSpace(episode.Review) ? "" : episode.Review)</small></span>
+                                    <span class="rating-pill">@(episode.Rating?.ToString("0.#") ?? "?")</span>
+                                </button>
+                            }
+                        </div>
+                        <h3>@(editingEpisodeId is null ? "Add an episode" : "Edit episode")</h3>
+                        <EditForm Model="episodeForm" OnValidSubmit="SaveEpisode" FormName="episode">
+                            <DataAnnotationsValidator />
+                            <div class="form-grid episode-form">
+                                <div class="field"><label for="season">Season</label><InputNumber id="season" @bind-Value="episodeForm.SeasonNumber" min="1" /><ValidationMessage For="() => episodeForm.SeasonNumber" /></div>
+                                <div class="field"><label for="episode">Episode <span>0 for a special</span></label><InputNumber id="episode" @bind-Value="episodeForm.EpisodeNumber" min="0" /><ValidationMessage For="() => episodeForm.EpisodeNumber" /></div>
+                                <div class="field"><label for="episode-rating">Rating <span>optional</span></label><div class="rating-input"><InputNumber id="episode-rating" @bind-Value="episodeForm.Rating" min="0" max="10" step="0.1" placeholder="?" /><span>/ 10</span></div><ValidationMessage For="() => episodeForm.Rating" /></div>
+                                <div class="field"><label for="episode-title">Episode title <span>optional</span></label><InputText id="episode-title" @bind-Value="episodeForm.Title" /><ValidationMessage For="() => episodeForm.Title" /></div>
+                                <div class="field wide"><label for="episode-review">Episode notes or review</label><InputTextArea id="episode-review" @bind-Value="episodeForm.Review" rows="4" placeholder="A scene, a song, a thought…" /></div>
+                            </div>
+                            <div class="form-actions"><button class="button primary" type="submit">@(editingEpisodeId is null ? "Add episode" : "Save episode")</button>@if (editingEpisodeId is not null) { <button class="button ghost" type="button" @onclick="ResetEpisode">Cancel edit</button> }</div>
+                        </EditForm>
+                        @if (editingEpisodeId is not null) { <button class="danger-link" @onclick="DeleteEpisode">Delete this episode</button> }
+                    </div>
+                }
+                @if (selectedId is not null)
+                {
+                    <div class="delete-area">
+                        @if (confirmDelete)
+                        {
+                            <span>Delete this title and all its episodes?</span><button class="danger-link" @onclick="DeleteMedia">Yes, delete</button><button class="text-button" @onclick="() => confirmDelete = false">Cancel</button>
+                        }
+                        else { <button class="danger-link" @onclick="() => confirmDelete = true">Delete title</button> }
+                    </div>
+                }
+            </section>
+        </div>
+    </main>
+    <footer>FRAME NOTES <span>·</span> Your viewing history, in your own words.</footer>
+</div>
+
+@code {
+    private List<MediaItem> items = [];
+    private MediaItem mediaForm = new() { Kind = MediaKind.Movie };
+    private Episode episodeForm = new() { SeasonNumber = 1, EpisodeNumber = 1 };
+    private int? selectedId;
+    private int? editingEpisodeId;
+    private string filter = "All";
+    private string search = "";
+    private string? error;
+    private string? message;
+    private bool confirmDelete;
+    private MediaItem? selectedItem => items.FirstOrDefault(x => x.Id == selectedId);
+    private IEnumerable<MediaItem> FilteredItems => items.Where(x =>
+        (filter == "All" || (filter == "Movies" && x.Kind == MediaKind.Movie) || (filter == "Series" && x.Kind == MediaKind.Series) || (filter == "Not on IMDb" && !x.SavedToImdb)) &&
+        x.Title.Contains(search, StringComparison.CurrentCultureIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await Refresh();
+
+    private async Task Refresh()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        items = await db.MediaItems.AsNoTracking().Include(x => x.Episodes).OrderByDescending(x => x.UpdatedAtUtc).ToListAsync();
+    }
+
+    private void ShowAll() => filter = "All";
+    private void ShowMovies() => filter = "Movies";
+    private void ShowSeries() => filter = "Series";
+    private void ShowNotOnImdb() => filter = "Not on IMDb";
+    private void StartNew()
+    {
+        selectedId = null;
+        mediaForm = new() { Kind = MediaKind.Movie };
+        ResetEpisode();
+        confirmDelete = false;
+        error = message = null;
+    }
+
+    private void SelectItem(int id)
+    {
+        var item = items.First(x => x.Id == id);
+        selectedId = id;
+        mediaForm = new() { Title = item.Title, Kind = item.Kind, ReleaseYear = item.ReleaseYear, Rating = item.Rating, Review = item.Review, SavedToImdb = item.SavedToImdb, SavedToLetterboxd = item.SavedToLetterboxd };
+        ResetEpisode();
+        confirmDelete = false;
+        error = message = null;
+    }
+
+    private async Task SaveMedia()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var item = selectedId is null ? new MediaItem() : await db.MediaItems.FindAsync(selectedId.Value);
+            if (item is null) return;
+            if (selectedId is not null && item.Kind == MediaKind.Series && mediaForm.Kind == MediaKind.Movie && await db.Episodes.AnyAsync(x => x.MediaItemId == item.Id))
+            {
+                error = "Remove this series's episodes before changing it to a movie.";
+                return;
+            }
+            item.Title = mediaForm.Title.Trim();
+            item.Kind = mediaForm.Kind;
+            item.ReleaseYear = mediaForm.ReleaseYear;
+            item.Rating = mediaForm.Rating;
+            item.Review = string.IsNullOrWhiteSpace(mediaForm.Review) ? null : mediaForm.Review.Trim();
+            item.SavedToImdb = mediaForm.SavedToImdb;
+            item.SavedToLetterboxd = mediaForm.SavedToLetterboxd;
+            item.UpdatedAtUtc = DateTime.UtcNow;
+            if (selectedId is null) db.MediaItems.Add(item);
+            await db.SaveChangesAsync();
+            await Refresh();
+            SelectItem(item.Id);
+            message = "Saved successfully.";
+        }
+        catch (Exception ex) { error = $"Could not save title: {ex.Message}"; }
+    }
+
+    private void ResetEpisode()
+    {
+        editingEpisodeId = null;
+        episodeForm = new() { SeasonNumber = 1, EpisodeNumber = (selectedItem?.Episodes.Where(x => x.SeasonNumber == 1).Select(x => x.EpisodeNumber).DefaultIfEmpty(0).Max() ?? 0) + 1 };
+    }
+
+    private void EditEpisode(Episode episode)
+    {
+        editingEpisodeId = episode.Id;
+        episodeForm = new() { SeasonNumber = episode.SeasonNumber, EpisodeNumber = episode.EpisodeNumber, Title = episode.Title, Rating = episode.Rating, Review = episode.Review };
+        error = message = null;
+    }
+
+    private async Task SaveEpisode()
+    {
+        if (selectedId is null) return;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            if (!await db.MediaItems.AnyAsync(x => x.Id == selectedId && x.Kind == MediaKind.Series)) return;
+            var exists = await db.Episodes.AnyAsync(x => x.MediaItemId == selectedId && x.SeasonNumber == episodeForm.SeasonNumber && x.EpisodeNumber == episodeForm.EpisodeNumber && x.Id != editingEpisodeId);
+            if (exists) { error = "That season and episode number already exists for this series."; return; }
+            var episode = editingEpisodeId is null ? new Episode { MediaItemId = selectedId.Value } : await db.Episodes.FindAsync(editingEpisodeId.Value);
+            if (episode is null || episode.MediaItemId != selectedId) return;
+            episode.SeasonNumber = episodeForm.SeasonNumber;
+            episode.EpisodeNumber = episodeForm.EpisodeNumber;
+            episode.Title = string.IsNullOrWhiteSpace(episodeForm.Title) ? null : episodeForm.Title.Trim();
+            episode.Rating = episodeForm.Rating;
+            episode.Review = string.IsNullOrWhiteSpace(episodeForm.Review) ? null : episodeForm.Review.Trim();
+            if (editingEpisodeId is null) db.Episodes.Add(episode);
+            var parent = await db.MediaItems.FindAsync(selectedId.Value);
+            if (parent is not null) parent.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            await Refresh();
+            ResetEpisode();
+            error = null;
+            message = "Episode saved.";
+        }
+        catch (Exception ex) { error = $"Could not save episode: {ex.Message}"; }
+    }
+
+    private async Task DeleteEpisode()
+    {
+        if (editingEpisodeId is null || selectedId is null) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var episode = await db.Episodes.FindAsync(editingEpisodeId.Value);
+        if (episode is null || episode.MediaItemId != selectedId) return;
+        db.Episodes.Remove(episode);
+        await db.SaveChangesAsync();
+        await Refresh();
+        ResetEpisode();
+        message = "Episode deleted.";
+    }
+
+    private async Task DeleteMedia()
+    {
+        if (selectedId is null) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var item = await db.MediaItems.FindAsync(selectedId.Value);
+        if (item is null) return;
+        db.MediaItems.Remove(item);
+        await db.SaveChangesAsync();
+        await Refresh();
+        StartNew();
+        message = "Title deleted.";
+    }
+}
