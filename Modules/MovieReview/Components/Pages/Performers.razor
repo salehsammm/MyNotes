@@ -1,0 +1,269 @@
+@rendermode InteractiveServer
+@page "/moviereview/performers"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject PerformerService PerformerService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / PERFORMERS</div><h1>Performers</h1><p>Keep track of the people in your collection.</p></div></div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input class="form-control" placeholder="Search performers (press Enter)..."
+               value="@_search" @onchange="OnSearchChanged" />
+    </div>
+    <div class="col-md-6 text-end">
+        <a href="/moviereview/performers/new" class="btn btn-primary">New performer</a>
+    </div>
+</div>
+
+<div class="scene-status-filters" aria-label="Filter performers">
+    <button type="button" class="@(_showArchived ? "scene-status-filter" : "scene-status-filter active")" @onclick="() => ShowArchived(false)">Active</button>
+    <button type="button" class="@(_showArchived ? "scene-status-filter active" : "scene-status-filter")" @onclick="() => ShowArchived(true)">Archived</button>
+</div>
+@if (!string.IsNullOrWhiteSpace(_notice)) { <div class="alert alert-success" role="status">@_notice</div> }
+@if (!string.IsNullOrWhiteSpace(_actionError)) { <div class="alert alert-danger" role="alert">@_actionError</div> }
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_totalCount == 0 && string.IsNullOrWhiteSpace(_search))
+{
+    <div class="empty-state"><span>♙</span><h3>@(_showArchived ? "No archived performers" : "No performers yet")</h3><p>@(_showArchived ? "Archived performers will appear here." : "Add someone to get started.")</p>@if (!_showArchived) { <a href="/moviereview/performers/new" class="btn btn-primary">New performer</a> }</div>
+}
+else if (Filtered().Count == 0)
+{
+    <div class="empty-state"><span>⌕</span><h3>No matching performers</h3><p>Try a different search term.</p></div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="cursor:pointer" @onclick='() => SortBy("name")'>Name @Arrow("name")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("skin")'>Skin @Arrow("skin")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("boobs")'>Boobs @Arrow("boobs")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("ass")'>Ass @Arrow("ass")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("bj")'>BJ @Arrow("bj")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("moans")'>Moans @Arrow("moans")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("watchlist")'>Watchlist @Arrow("watchlist")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("created")'>Created @Arrow("created")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("updated")'>Updated @Arrow("updated")</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in PageItems())
+            {
+                <tr>
+                    <td><a href="/moviereview/performers/@p.Id/view">@p.Name</a></td>
+                    <td>@p.SkinColor?.Name</td>
+                    <td>@p.BoobSize?.Name @p.BoobsQuality</td>
+                    <td>@p.AssSize?.Name @p.AssQuality</td>
+                    <td>@string.Join(", ", new[] { p.BjQuality, string.Join(", ", p.BjTags.Select(t => t.Name)) }.Where(x => !string.IsNullOrWhiteSpace(x)))</td>
+                    <td>@p.Moans</td>
+                    <td>@(p.IsWatchlisted ? "✓" : "")</td>
+                    <td>@FormatDate(p.CreatedDate)</td>
+                    <td>@FormatDate(p.LastUpdate)</td>
+                    <td>
+                        <a href="/moviereview/performers/@p.Id" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                        @if (_showArchived)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => SetArchived(p.Id, false)">Restore</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-primary me-1" disabled="@(_totalCount < 2)" @onclick="() => OpenMerge(p)">Merge</button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => SetArchived(p.Id, true)">Archive</button>
+                        }
+                        <button class="btn btn-sm btn-danger" @onclick="() => Delete(p.Id, p.Name)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page == 1)" @onclick="PrevPage">← Prev</button>
+        <span>Page @_page of @TotalPages() (@_totalCount total)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page >= TotalPages())" @onclick="NextPage">Next →</button>
+    </div>
+}
+
+@if (_mergeSource is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Merge duplicate performer</h5><button type="button" class="btn-close" @onclick="CloseMerge" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p><strong>@_mergeSource.Name</strong> is the duplicate. Choose the main performer to keep.</p>
+                    <label for="mergeSearch">Find main performer</label>
+                    <input id="mergeSearch" class="form-control mb-2" type="search" placeholder="Search by name..." @bind="_mergeSearch" @bind:event="oninput" @bind:after="ResetMergeSelection" />
+                    <select class="form-control" aria-label="Main performer" @bind="_mergeMainId" @bind:after="LoadMergePreview">
+                        <option value="0">-- choose main performer --</option>
+                        @foreach (var performer in MatchingMergeTargets())
+                        {
+                            <option value="@performer.Id">@performer.Name</option>
+                        }
+                    </select>
+                    @if (_mergePreview is { } preview)
+                    {
+                        <div class="scene-editor-status mt-3 mb-0"><strong>@preview.ToMove scene@((preview.ToMove == 1) ? "" : "s") to move</strong><span>@preview.AlreadyShared already linked to the main performer</span></div>
+                    }
+                    <p class="text-muted mt-3 mb-0">The main performer keeps their profile. Scene links from @_mergeSource.Name move to the main performer. If both already appear in one scene, the main performer's scene entry is kept. @_mergeSource.Name will be archived.</p>
+                    @if (!string.IsNullOrWhiteSpace(_mergeError)) { <div class="alert alert-danger mt-3 mb-0" role="alert">@_mergeError</div> }
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" @onclick="CloseMerge">Cancel</button><button type="button" class="btn btn-primary" disabled="@(_mergeMainId == 0 || _merging)" @onclick="Merge">@(_merging ? "Merging..." : "Merge and archive")</button></div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Performer> _performers = new();
+    private bool _loading = true;
+
+    private const int PageSize = 20;
+    private int _page = 1;
+
+    private string _sortKey = "name";
+    private bool _sortAsc = true;
+
+    private string _search = "";
+    private int _totalCount;
+    private bool _showArchived;
+    private string? _notice;
+    private string? _actionError;
+    private Performer? _mergeSource;
+    private List<Performer> _mergeTargets = new();
+    private string _mergeSearch = "";
+    private int _mergeMainId;
+    private string? _mergeError;
+    private bool _merging;
+    private (int ToMove, int AlreadyShared)? _mergePreview;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var result = await PerformerService.GetPageAsync(_search, _sortKey, _sortAsc, _page, PageSize, archived: _showArchived);
+        _performers = result.Items;
+        _totalCount = result.Total;
+        _loading = false;
+        if (_page > TotalPages()) { _page = TotalPages(); await Reload(); }
+    }
+
+    private async Task OnSearchChanged(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? "";
+        _page = 1;
+        await Reload();
+    }
+
+    private async Task SortBy(string key)
+    {
+        if (_sortKey == key) _sortAsc = !_sortAsc;
+        else { _sortKey = key; _sortAsc = true; }
+        _page = 1;
+        await Reload();
+    }
+
+    private string Arrow(string key)
+    {
+        if (_sortKey != key) return "";
+        return _sortAsc ? "▲" : "▼";
+    }
+
+    private static string FormatDate(DateTime d) =>
+        d == default ? "—" : d.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private List<Performer> Filtered() => _performers;
+    private async Task ShowArchived(bool archived)
+    {
+        _showArchived = archived;
+        _page = 1;
+        _notice = null;
+        _actionError = null;
+        await Reload();
+    }
+
+    private async Task SetArchived(int id, bool archived)
+    {
+        _actionError = null;
+        try
+        {
+            await PerformerService.SetArchivedAsync(id, archived);
+            _notice = archived ? "Performer archived. Their existing scene links are kept." : "Performer restored.";
+            await Reload();
+        }
+        catch (InvalidOperationException ex) { _actionError = ex.Message; }
+    }
+
+    private async Task OpenMerge(Performer source)
+    {
+        _mergeSource = source;
+        _mergeTargets = (await PerformerService.GetAllAsync()).Where(p => p.Id != source.Id).ToList();
+        _mergeSearch = "";
+        _mergeMainId = 0;
+        _mergeError = null;
+        _mergePreview = null;
+    }
+
+    private List<Performer> MatchingMergeTargets() => _mergeTargets
+        .Where(p => p.Name.Contains(_mergeSearch.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private void ResetMergeSelection()
+    {
+        _mergeMainId = 0;
+        _mergePreview = null;
+    }
+
+    private async Task LoadMergePreview()
+    {
+        _mergePreview = _mergeSource is null || _mergeMainId == 0
+            ? null
+            : await PerformerService.GetMergePreviewAsync(_mergeSource.Id, _mergeMainId);
+    }
+
+    private void CloseMerge()
+    {
+        _mergeSource = null;
+        _mergeTargets.Clear();
+        _mergeError = null;
+    }
+
+    private async Task Merge()
+    {
+        if (_mergeSource is null || _mergeMainId == 0 || _merging) return;
+        _merging = true;
+        _mergeError = null;
+        var sourceName = _mergeSource.Name;
+        var mainName = _mergeTargets.FirstOrDefault(p => p.Id == _mergeMainId)?.Name;
+        try
+        {
+            await PerformerService.MergeAsync(_mergeSource.Id, _mergeMainId);
+            CloseMerge();
+            _notice = $"Merged {sourceName} into {mainName} and archived {sourceName}.";
+            await Reload();
+        }
+        catch (InvalidOperationException ex) { _mergeError = ex.Message; }
+        catch { _mergeError = "Could not merge these performers. Please try again."; }
+        finally { _merging = false; }
+    }
+
+    private int TotalPages() => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)PageSize));
+    private IEnumerable<Performer> PageItems() => _performers;
+    private async Task PrevPage() { if (_page > 1) { _page--; await Reload(); } }
+    private async Task NextPage() { if (_page < TotalPages()) { _page++; await Reload(); } }
+
+    private async Task Delete(int id, string name)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete performer \"{name}\"? This cannot be undone."))
+            return;
+        await PerformerService.DeleteAsync(id);
+        await Reload();
+    }
+}

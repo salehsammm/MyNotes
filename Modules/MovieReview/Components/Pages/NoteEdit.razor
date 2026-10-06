@@ -1,0 +1,72 @@
+@rendermode InteractiveServer
+@page "/moviereview/notes/new"
+@page "/moviereview/notes/{Id:int}"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using Markdig
+@inject NoteService NoteService
+@inject NavigationManager Nav
+
+<h1>@(Id == 0 ? "New note" : "Edit note")</h1>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_note is null)
+{
+    <p>Note not found. <a href="/moviereview/notes">Back</a></p>
+}
+else
+{
+    <EditForm Model="_note" OnValidSubmit="Save" FormName="noteForm">
+        <div class="mb-2">
+            <label>Title</label>
+            <InputText @bind-Value="_note.Title" class="form-control" />
+        </div>
+        <div class="mb-2">
+            <label>Category</label>
+            <InputText @bind-Value="_note.Category" class="form-control" placeholder="e.g. Relationships, Self-development" />
+        </div>
+        <div class="mb-2">
+            <label>Body (Markdown supported)</label>
+            <InputTextArea @bind-Value="_note.Body" class="form-control" rows="18" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/moviereview/notes" class="btn btn-secondary ms-2">Back</a>
+    </EditForm>
+
+    <hr />
+    <h3>Preview</h3>
+    <div class="markdown-body">
+        @((MarkupString)RenderMarkdown(_note.Body))
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Note? _note;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _note = Id == 0 ? new Note() : await NoteService.GetAsync(Id);
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        if (_note is null) return;
+        if (_note.Id == 0) await NoteService.AddAsync(_note);
+        else await NoteService.UpdateAsync(_note);
+        Nav.NavigateTo("/moviereview/notes");
+    }
+
+    private static string RenderMarkdown(string body)
+    {
+        return Markdown.ToHtml(body ?? "");
+    }
+}

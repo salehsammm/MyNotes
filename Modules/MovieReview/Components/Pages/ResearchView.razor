@@ -1,0 +1,123 @@
+@rendermode InteractiveServer
+@page "/moviereview/research/{Id:int}"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using Markdig
+@inject ResearchService ResearchService
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_doc is null)
+{
+    <p>Doc not found. <a href="/moviereview/research">Back</a></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>@_doc.Title</h1>
+        <div>
+            <a href="/moviereview/research/@_doc.Id/edit" class="btn btn-outline-secondary">Edit</a>
+            <a href="/moviereview/research" class="btn btn-secondary ms-2">Back</a>
+        </div>
+    </div>
+
+    @if (_sections.Count == 0)
+    {
+        <p>No sections yet. Click Edit to add.</p>
+    }
+    else
+    {
+        @RenderTree(null, 0)
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ResearchDoc? _doc;
+    private List<ResearchSection> _sections = new();
+    private bool _loading = true;
+
+    private HashSet<int> _expanded = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _doc = await ResearchService.GetDocAsync(Id);
+        if (_doc is not null)
+        {
+            _sections = await ResearchService.GetSectionsAsync(Id);
+            // expand all top-level by default
+            foreach (var s in _sections.Where(x => x.ParentId == null))
+                _expanded.Add(s.Id);
+        }
+        _loading = false;
+    }
+
+    private RenderFragment RenderTree(int? parentId, int depth) => builder =>
+    {
+        var children = _sections
+            .Where(s => s.ParentId == parentId)
+            .OrderBy(s => s.SortOrder)
+            .ToList();
+
+        foreach (var s in children)
+        {
+            var s1 = s;
+            var d1 = depth;
+
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "mb-2");
+            builder.AddAttribute(2, "style", $"margin-left:{d1 * 24}px");
+
+            builder.OpenElement(3, "div");
+            builder.AddAttribute(4, "class", "d-flex align-items-center gap-2");
+            builder.AddAttribute(5, "style", "cursor:pointer");
+            builder.AddAttribute(6, "onclick",
+                Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, () => Toggle(s1.Id)));
+
+            var hasChildren = _sections.Any(x => x.ParentId == s1.Id);
+            builder.OpenElement(7, "span");
+            builder.AddContent(8, hasChildren ? (_expanded.Contains(s1.Id) ? "▼" : "▶") : "•");
+            builder.CloseElement();
+
+            builder.OpenElement(9, "strong");
+            builder.AddContent(10, s1.Heading);
+            builder.CloseElement();
+
+            if (!string.IsNullOrWhiteSpace(s1.Weight))
+            {
+                builder.OpenElement(11, "span");
+                builder.AddAttribute(12, "class", "badge bg-info text-dark");
+                builder.AddContent(13, s1.Weight);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement(); // row
+
+            if (_expanded.Contains(s1.Id))
+            {
+                if (!string.IsNullOrWhiteSpace(s1.Body))
+                {
+                    builder.OpenElement(20, "div");
+                    builder.AddAttribute(21, "class", "markdown-body ms-3 mt-1");
+                    builder.AddContent(22, (MarkupString)Markdown.ToHtml(s1.Body));
+                    builder.CloseElement();
+                }
+
+                builder.OpenElement(30, "div");
+                builder.AddContent(31, RenderTree(s1.Id, d1 + 1));
+                builder.CloseElement();
+            }
+
+            builder.CloseElement(); // wrapper
+        }
+    };
+
+    private void Toggle(int id)
+    {
+        if (!_expanded.Remove(id)) _expanded.Add(id);
+    }
+}

@@ -1,0 +1,26 @@
+<div class="brand-wrap">
+    <a class="brand" href="/moviereview"><span class="brand-mark">M<span>.</span></span><span>MovieReviews<small>THE COLLECTION</small></span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" />
+    <label for="nav-toggle" class="nav-toggle-label"><span></span><span></span><span></span></label>
+</div>
+
+<div class="nav-scrollable" onclick="document.getElementById('nav-toggle').checked = false">
+    <div class="nav-caption">WORKSPACE</div>
+    <nav class="nav flex-column" aria-label="Main navigation">
+        <NavLink class="nav-link" href="/moviereview" Match="NavLinkMatch.All"><span class="nav-icon">⌂</span> Overview</NavLink>
+        <NavLink class="nav-link" href="/moviereview/scenes"><span class="nav-icon">▣</span> Scenes</NavLink>
+        <NavLink class="nav-link" href="/moviereview/performers"><span class="nav-icon">♙</span> Performers</NavLink>
+        <NavLink class="nav-link" href="/moviereview/watchlist"><span class="nav-icon">☆</span> Watchlist</NavLink>
+        <NavLink class="nav-link" href="/moviereview/studios"><span class="nav-icon">◈</span> Studios</NavLink>
+        <NavLink class="nav-link" href="/moviereview/stats"><span class="nav-icon">▥</span> Stats</NavLink>
+        <NavLink class="nav-link" href="/moviereview/trophies"><span class="nav-icon">★</span> Trophies</NavLink>
+        <NavLink class="nav-link" href="/moviereview/ideas"><span class="nav-icon">✧</span> Ideas</NavLink>
+        <div class="nav-caption nav-caption-secondary">LIBRARY</div>
+        <NavLink class="nav-link" href="/moviereview/notes"><span class="nav-icon">▤</span> Notes</NavLink>
+        <NavLink class="nav-link" href="/moviereview/research"><span class="nav-icon">⌕</span> Research</NavLink>
+        <NavLink class="nav-link" href="/moviereview/guide"><span class="nav-icon">◫</span> Guide</NavLink>
+        <div class="nav-caption nav-caption-secondary">PREFERENCES</div>
+        <NavLink class="nav-link" href="/moviereview/options"><span class="nav-icon">⚙</span> Options</NavLink>
+    </nav>
+</div>
+<div class="sidebar-footer"><span class="footer-mark">MR</span><span>Made for your collection<small>Keep everything in one place.</small></span></div>

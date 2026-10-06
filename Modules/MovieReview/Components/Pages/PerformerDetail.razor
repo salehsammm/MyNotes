@@ -1,0 +1,39 @@
+@page "/moviereview/performers/{Id:int}/view"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject PerformerService PerformerService
+@inject SceneService SceneService
+
+<PageTitle>@(_performer?.Name ?? "Performer") · MovieReviews</PageTitle>
+
+@if (_loading)
+{
+    <p>Loading performer...</p>
+}
+else if (_performer is null)
+{
+    <div class="empty-state"><h3>Performer not found</h3><a href="/moviereview/performers">Back to performers</a></div>
+}
+else
+{
+    <div class="detail-top"><div><div class="eyebrow">YOUR COLLECTION / PERFORMER</div><h1>@_performer.Name</h1><div class="detail-meta">@if (_performer.IsArchived) { <span class="scene-status scene-status-draft">Archived</span> }@if (_performer.IsWatchlisted && !_performer.IsArchived) { <span class="mini-tag">★ Watchlisted</span> } <span>@_scenes.Count scene@(_scenes.Count == 1 ? "" : "s")</span></div></div><div class="detail-actions"><a href="/moviereview/performers" class="btn btn-outline-secondary">← Performers</a><a href="/moviereview/performers/@Id" class="btn btn-primary">Edit performer</a></div></div>
+    <div class="detail-grid"><section class="detail-card"><div class="detail-section-title">SCENES WITH @_performer.Name.ToUpperInvariant()</div>@if (_scenes.Count == 0) { <p class="text-muted mb-0">No scenes linked yet.</p> } else { @foreach (var scene in _scenes.OrderByDescending(s => s.LastUpdate)) { <a class="detail-scene-row" href="/moviereview/scenes/@scene.Id/view"><span><strong>@scene.Title</strong><small>@(scene.Studio ?? "Scene review")</small></span><span class="rating-badge @RatingClass(scene.OverallRating)">@(scene.OverallRating?.ToString() ?? "Draft")</span><span>→</span></a> } }</section><aside class="detail-side"><div class="detail-card"><div class="detail-section-title">ATTRIBUTES</div><div class="detail-facts"><div><span>Skin</span><strong>@Value(_performer.SkinColor?.Name)</strong></div><div><span>Boob size</span><strong>@Value(_performer.BoobSize?.Name)</strong></div><div><span>Boobs quality</span><strong>@Value(_performer.BoobsQuality)</strong></div><div><span>Ass size</span><strong>@Value(_performer.AssSize?.Name)</strong></div><div><span>Ass quality</span><strong>@Value(_performer.AssQuality)</strong></div><div><span>BJ quality</span><strong>@Value(_performer.BjQuality)</strong></div><div><span>Moans</span><strong>@Value(_performer.Moans)</strong></div><div><span>Face</span><strong>@Value(_performer.FaceQuality)</strong></div><div><span>Body size</span><strong>@Value(_performer.BodySize)</strong></div><div><span>Body quality</span><strong>@Value(_performer.BodyQuality)</strong></div><div><span>Legs</span><strong>@Value(_performer.LegQuality)</strong></div></div></div>@if (_performer.BjTags.Count > 0) { <div class="detail-card"><div class="detail-section-title">BJ TAGS</div><div class="tag-list">@foreach (var tag in _performer.BjTags) { <span class="mini-tag">@tag.Name</span> }</div></div> }@if (!string.IsNullOrWhiteSpace(_performer.Notes)) { <div class="detail-card"><div class="detail-section-title">NOTES</div><p class="mb-0">@_performer.Notes</p></div> }</aside></div>
+    <div class="detail-card mt-3"><div class="detail-section-title">EXTRA DETAILS</div><div class="detail-facts"><div><span>Age category</span><strong>@(_performer.AgeCategory is { } age ? PerformerAgeCategories.Label(age) : "—")</strong></div><div><span>Belly quality</span><strong>@Value(_performer.BellyQuality)</strong></div><div><span>Does not speak English</span><strong>@(_performer.DoesNotSpeakEnglish ? "Yes" : "No")</strong></div></div></div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Performer? _performer;
+    private List<Scene> _scenes = new();
+    private bool _loading = true;
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _performer = await PerformerService.GetAsync(Id);
+        if (_performer is not null) _scenes = (await SceneService.GetAllAsync()).Where(s => s.Performers.Any(sp => sp.PerformerId == Id)).ToList();
+        _loading = false;
+    }
+    private static string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    private static string RatingClass(Rating? rating) => rating is null ? "rating-unset" : $"rating-{rating.ToString()!.ToLowerInvariant()}";
+}

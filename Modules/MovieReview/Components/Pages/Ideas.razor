@@ -1,0 +1,127 @@
+@rendermode InteractiveServer
+@page "/moviereview/ideas"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject IdeaService IdeaService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR WORKSPACE / IDEAS</div><h1>Ideas</h1><p>A place for the next thing on your mind.</p></div></div>
+
+<form @onsubmit="Add" @onsubmit:preventDefault>
+    <div class="input-group mb-3">
+        <input @bind="_newText" class="form-control" placeholder="New idea..." />
+        <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+</form>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_ideas.Count == 0)
+{
+    <div class="empty-state"><span>✧</span><h3>No ideas yet</h3><p>Add one above whenever inspiration strikes.</p></div>
+}
+else
+{
+    <ul class="list-group">
+        @for (int i = 0; i < _ideas.Count; i++)
+        {
+            var idea = _ideas[i];
+            <li class="list-group-item d-flex align-items-center gap-2" @key="idea.Id">
+                <input type="checkbox" class="form-check-input"
+                       checked="@idea.IsDone"
+                       @onchange="() => Toggle(idea.Id)" />
+                <span class="@(idea.IsDone ? "text-decoration-line-through text-muted" : "") flex-grow-1"
+                      @ondblclick="() => StartEdit(idea)">
+                    @if (_editingId == idea.Id)
+                    {
+                        <input class="form-control form-control-sm"
+                               value="@_editText"
+                               @oninput="e => _editText = (string)e.Value!"
+                               @onblur="() => SaveEdit(idea)"
+                               @onkeydown="e => HandleKey(e, idea)" />
+                    }
+                    else
+                    {
+                        @idea.Text
+                    }
+                </span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Move(idea.Id, true)" title="Up">↑</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Move(idea.Id, false)" title="Down">↓</button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(idea.Id, idea.Text)">x</button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Idea> _ideas = new();
+    private bool _loading = true;
+    private string _newText = "";
+
+    private int _editingId = 0;
+    private string _editText = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _ideas = await IdeaService.GetAllAsync();
+        _loading = false;
+    }
+
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_newText)) return;
+        await IdeaService.AddAsync(_newText.Trim());
+        _newText = "";
+        await Reload();
+    }
+
+    private async Task Toggle(int id)
+    {
+        await IdeaService.ToggleDoneAsync(id);
+        await Reload();
+    }
+
+    private async Task Delete(int id, string text)
+    {
+        var preview = text.Length > 60 ? text[..60] + "…" : text;
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete idea \"{preview}\"?"))
+            return;
+        await IdeaService.DeleteAsync(id);
+        await Reload();
+    }
+
+    private async Task Move(int id, bool up)
+    {
+        await IdeaService.MoveAsync(id, up);
+        await Reload();
+    }
+
+    private void StartEdit(Idea idea)
+    {
+        _editingId = idea.Id;
+        _editText = idea.Text;
+    }
+
+    private async Task SaveEdit(Idea idea)
+    {
+        if (_editingId != idea.Id) return;
+        if (!string.IsNullOrWhiteSpace(_editText))
+        {
+            idea.Text = _editText.Trim();
+            await IdeaService.UpdateAsync(idea);
+        }
+        _editingId = 0;
+        await Reload();
+    }
+
+    private async Task HandleKey(KeyboardEventArgs e, Idea idea)
+    {
+        if (e.Key == "Enter") await SaveEdit(idea);
+        else if (e.Key == "Escape") { _editingId = 0; }
+    }
+}

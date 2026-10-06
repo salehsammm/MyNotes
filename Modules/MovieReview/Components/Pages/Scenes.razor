@@ -1,0 +1,582 @@
+@rendermode InteractiveServer
+@page "/moviereview/scenes"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using System.Text
+@inject SceneService SceneService
+@inject PerformerService PerformerService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / SCENES</div><h1>Scenes</h1><p>Browse, search, and organize your reviews.</p></div></div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input class="form-control" placeholder="Search scenes (title, studio, performers)..."
+               value="@_search" @oninput="OnSearchChanged" />
+    </div>
+    <div class="col-md-6 text-end">
+        <a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a>
+    </div>
+</div>
+
+<div class="scene-status-filters" aria-label="Filter by review status">
+    <button type="button" class="@StatusFilterClass("")" @onclick='() => SetStatusFilter("")'>All <span>@_scenes.Count</span></button>
+    <button type="button" class="@StatusFilterClass("complete")" @onclick='() => SetStatusFilter("complete")'>Complete <span>@_scenes.Count(s => !s.IsDraft)</span></button>
+    <button type="button" class="@StatusFilterClass("draft")" @onclick='() => SetStatusFilter("draft")'>Drafts <span>@_scenes.Count(s => s.IsDraft)</span></button>
+</div>
+
+<div class="filter-panel mb-3">
+    <div class="filter-title">FILTER REVIEWS <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">Clear filters</button></div>
+    <div class="filter-grid">
+        <label>Minimum rating<select class="form-control" @bind="_minRating" @bind:after="ResetPage"><option value="">Any</option>@foreach (var rating in Enum.GetValues<Rating>()) { <option value="@rating">@rating</option> }</select></label>
+        <label>Maximum rating<select class="form-control" @bind="_maxRating" @bind:after="ResetPage"><option value="">Any</option>@foreach (var rating in Enum.GetValues<Rating>()) { <option value="@rating">@rating</option> }</select></label>
+        <label>POV<select class="form-control" @bind="_pov" @bind:after="ResetPage"><option value="">Any</option><option value="yes">POV only</option><option value="no">Non-POV only</option></select></label>
+        <label>Position<select class="form-control" @bind="_position" @bind:after="ResetPage"><option value="">Any</option>@foreach (var position in Enum.GetValues<Position>()) { <option value="@position">@position</option> }</select></label>
+        <label>Location<select class="form-control" @bind="_location" @bind:after="ResetPage"><option value="">Any</option>@foreach (var location in Enum.GetValues<Location>()) { <option value="@location">@location</option> }</select></label>
+        <label>Performer<select class="form-control" @bind="_performerId" @bind:after="ResetPage"><option value="0">Any</option>@foreach (var performer in _allPerformers) { <option value="@performer.Id">@performer.Name</option> }</select></label>
+        <label>Tag<input class="form-control" placeholder="e.g. favorite" @bind="_tag" @bind:event="oninput" @bind:after="ResetPage" /></label>
+        <label>Skin<input class="form-control" placeholder="e.g. tanned" @bind="_skin" @bind:event="oninput" @bind:after="ResetPage" /></label>
+        <label>Boob size<input class="form-control" placeholder="e.g. small or B" @bind="_boobs" @bind:event="oninput" @bind:after="ResetPage" /></label>
+        <label>BJ quality / tag<input class="form-control" placeholder="e.g. good" @bind="_bj" @bind:event="oninput" @bind:after="ResetPage" /></label>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_scenes.Count == 0)
+{
+    <div class="empty-state"><span>▣</span><h3>No scenes yet</h3><p>Start your collection with your first review.</p><a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a></div>
+}
+else if (Filtered().Count == 0)
+{
+    <div class="empty-state"><span>⌕</span><h3>No matching scenes</h3><p>Try a different search or filter.</p></div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="cursor:pointer" @onclick='() => SortBy("title")'>Title @Arrow("title")</th>
+                <th>Status</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("studio")'>Studio @Arrow("studio")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("overall")'>Overall @Arrow("overall")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("setup")'>Setup @Arrow("setup")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("sex")'>Sex @Arrow("sex")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("performers")'>Performers @Arrow("performers")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("positions")'>Positions @Arrow("positions")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("locations")'>Locations @Arrow("locations")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("created")'>Created @Arrow("created")</th>
+                <th style="cursor:pointer" @onclick='() => SortBy("updated")'>Updated @Arrow("updated")</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in PageItems())
+            {
+                <tr>
+                    <td><a href="/moviereview/scenes/@s.Id/view">@s.Title</a>@if (s.IsDraft && s.ResumeAtSeconds is int resume) { <small class="d-block text-muted">Continue at @PlaybackPosition.Format(resume)</small> }</td>
+                    <td><span class="scene-status @(s.IsDraft ? "scene-status-draft" : "scene-status-complete")">@(s.IsDraft ? "Draft" : "Complete")</span></td>
+                    <td>@if (!string.IsNullOrWhiteSpace(s.Studio)) { <a href="/moviereview/studios/@Uri.EscapeDataString(s.Studio)">@s.Studio</a> }</td>
+                    <td><span class="rating-badge @RatingClass(s.OverallRating)">@FormatRating(s.OverallRating, s.OverallModifier)</span></td>
+                    <td><span class="rating-badge @RatingClass(s.SetupRating)">@FormatRating(s.SetupRating, s.SetupModifier)</span></td>
+                    <td><span class="rating-badge @RatingClass(s.SexRating)">@FormatRating(s.SexRating, s.SexModifier)</span></td>
+                    <td>@string.Join(", ", s.Performers.Select(p => p.Performer.Name))</td>
+                    <td><div class="tag-list">@foreach (var position in s.Positions) { <span class="mini-tag">@position</span> }</div></td>
+                    <td><div class="tag-list">@foreach (var location in s.Locations) { <span class="mini-tag">@location</span> }</div></td>
+                    <td>@FormatDate(s.CreatedDate)</td>
+                    <td>@FormatDate(s.LastUpdate)</td>
+                    <td>
+                        @if (s.IsDraft)
+                        {
+                            <button type="button" class="btn btn-sm @(s.IsPinnedDraft ? "btn-primary" : "btn-outline-primary") me-1" @onclick="() => ToggleDraftPin(s.Id)">@(s.IsPinnedDraft ? "Unpin" : "Pin")</button>
+                        }
+                        <a href="/moviereview/scenes/@s.Id" class="btn btn-sm btn-outline-secondary me-1">@(s.IsDraft ? "Continue" : "Edit")</a>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => OpenExport(s.Id)">Export</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => Delete(s.Id, s.Title)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page == 1)" @onclick="PrevPage">← Prev</button>
+        <span>Page @_page of @TotalPages() (@Filtered().Count total)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page >= TotalPages())" @onclick="NextPage">Next →</button>
+    </div>
+}
+
+@if (_exportOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Export scene</h5>
+                    <button type="button" class="btn-close" @onclick="CloseExport"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea class="form-control font-monospace" rows="20" style="width:100%"
+                              @bind="_exportText" @bind:event="oninput"></textarea>
+                    @if (_copied)
+                    {
+                        <div class="alert alert-success mt-2 mb-0 py-1">Copied!</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseExport">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="CopyExport">Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    private List<Scene> _scenes = new();
+    private List<Performer> _allPerformers = new();
+    private Dictionary<int, Performer> _performersById = new();
+    private bool _loading = true;
+
+    private const int PageSize = 20;
+    private int _page = 1;
+
+    private string _sortKey = "updated";
+    private bool _sortAsc = false;
+
+    private string _search = "";
+    private string _statusFilter = "";
+    private Rating? _minRating;
+    private Rating? _maxRating;
+    private string _pov = "";
+    private Position? _position;
+    private Location? _location;
+    private int _performerId;
+    private string _tag = "";
+    private string _skin = "";
+    private string _boobs = "";
+    private string _bj = "";
+
+    private bool _exportOpen;
+    private string _exportText = "";
+    private bool _copied;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    protected override void OnParametersSet()
+    {
+        if (Status is "draft" or "complete") SetStatusFilter(Status);
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var scenesTask = SceneService.GetAllAsync();
+        var performersTask = PerformerService.GetAllAsync(includeArchived: true);
+        await Task.WhenAll(scenesTask, performersTask);
+        _scenes = await scenesTask;
+        _allPerformers = await performersTask;
+        _performersById = _allPerformers.ToDictionary(p => p.Id);
+        _loading = false;
+        if (_page > TotalPages()) _page = Math.Max(1, TotalPages());
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? "";
+        _page = 1;
+    }
+
+    private void ResetPage() => _page = 1;
+
+    private void SetStatusFilter(string status)
+    {
+        _statusFilter = status;
+        _page = 1;
+    }
+
+    private string StatusFilterClass(string status) =>
+        "scene-status-filter" + (_statusFilter == status ? " active" : "");
+
+    private void ClearFilters()
+    {
+        _search = _tag = _skin = _boobs = _bj = _pov = "";
+        _statusFilter = "";
+        _minRating = _maxRating = null;
+        _position = null;
+        _location = null;
+        _performerId = 0;
+        _page = 1;
+    }
+
+    private void SortBy(string key)
+    {
+        if (_sortKey == key) _sortAsc = !_sortAsc;
+        else { _sortKey = key; _sortAsc = true; }
+        _page = 1;
+    }
+
+    private string Arrow(string key)
+    {
+        if (_sortKey != key) return "";
+        return _sortAsc ? "▲" : "▼";
+    }
+
+    private static string FormatDate(DateTime d) =>
+        d == default ? "—" : d.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private List<Scene> Filtered()
+    {
+        var q = _search.Trim();
+        return _scenes.Where(s =>
+            (_statusFilter == "" || (_statusFilter == "draft") == s.IsDraft) &&
+            (string.IsNullOrWhiteSpace(q) || Contains(s.Title, q) || Contains(s.Studio, q) || s.Performers.Any(sp => Contains(sp.Performer.Name, q))) &&
+            (!_minRating.HasValue || s.OverallRating >= _minRating.Value) &&
+            (!_maxRating.HasValue || s.OverallRating <= _maxRating.Value) &&
+            (_pov == "" || s.IsPov == (_pov == "yes")) &&
+            (!_position.HasValue || s.Positions.Contains(_position.Value)) &&
+            (!_location.HasValue || s.Locations.Contains(_location.Value)) &&
+            (_performerId == 0 || s.Performers.Any(sp => sp.PerformerId == _performerId)) &&
+            (string.IsNullOrWhiteSpace(_tag) || Contains(s.Tags, _tag.Trim())) &&
+            (string.IsNullOrWhiteSpace(_skin) || s.Performers.Any(sp => Contains(sp.SkinOverride, _skin.Trim()) || MatchPerformer(sp, p => Contains(p.SkinColor?.Name, _skin.Trim())))) &&
+            (string.IsNullOrWhiteSpace(_boobs) || s.Performers.Any(sp => Contains(sp.BoobsOverride, _boobs.Trim()) || MatchPerformer(sp, p => MatchBoobSize(p, _boobs.Trim())))) &&
+            (string.IsNullOrWhiteSpace(_bj) || s.Performers.Any(sp => Contains(sp.BjOverride, _bj.Trim()) || MatchPerformer(sp, p => Contains(p.BjQuality, _bj.Trim()) || p.BjTags.Any(t => Contains(t.Name, _bj.Trim())))))
+        ).ToList();
+    }
+
+    private bool MatchPerformer(ScenePerformer link, Func<Performer, bool> predicate) =>
+        _performersById.TryGetValue(link.PerformerId, out var performer) && predicate(performer);
+
+    private static bool MatchBoobSize(Performer performer, string term)
+    {
+        var size = performer.BoobSize?.Name ?? "";
+        if (Contains(size, term)) return true;
+        return term.Equals("small", StringComparison.OrdinalIgnoreCase) && (size.Equals("A", StringComparison.OrdinalIgnoreCase) || size.Equals("B", StringComparison.OrdinalIgnoreCase)) ||
+            term.Equals("medium", StringComparison.OrdinalIgnoreCase) && (size.Equals("C", StringComparison.OrdinalIgnoreCase) || size.Equals("D", StringComparison.OrdinalIgnoreCase)) ||
+            term.Equals("big", StringComparison.OrdinalIgnoreCase) && (size.Equals("E", StringComparison.OrdinalIgnoreCase) || size.Equals("F", StringComparison.OrdinalIgnoreCase) || size.Equals("G", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool Contains(string? source, string q) =>
+        !string.IsNullOrWhiteSpace(source) &&
+        source.Contains(q, StringComparison.OrdinalIgnoreCase);
+
+    private IEnumerable<Scene> Sorted()
+    {
+        var list = Filtered();
+        var sorted = _sortKey switch
+        {
+            "title" => _sortAsc ? list.OrderBy(s => s.Title) : list.OrderByDescending(s => s.Title),
+            "studio" => _sortAsc ? list.OrderBy(s => s.Studio ?? "") : list.OrderByDescending(s => s.Studio ?? ""),
+            "overall" => _sortAsc ? list.OrderBy(s => s.OverallRating).ThenBy(s => s.OverallModifier) : list.OrderByDescending(s => s.OverallRating).ThenByDescending(s => s.OverallModifier),
+            "setup" => _sortAsc ? list.OrderBy(s => s.SetupRating).ThenBy(s => s.SetupModifier) : list.OrderByDescending(s => s.SetupRating).ThenByDescending(s => s.SetupModifier),
+            "sex" => _sortAsc ? list.OrderBy(s => s.SexRating).ThenBy(s => s.SexModifier) : list.OrderByDescending(s => s.SexRating).ThenByDescending(s => s.SexModifier),
+            "created" => _sortAsc ? list.OrderBy(s => s.CreatedDate) : list.OrderByDescending(s => s.CreatedDate),
+            "updated" => _sortAsc ? list.OrderBy(s => s.LastUpdate) : list.OrderByDescending(s => s.LastUpdate),
+            "performers" => _sortAsc ? list.OrderBy(s => string.Join(", ", s.Performers.Select(p => p.Performer.Name))) : list.OrderByDescending(s => string.Join(", ", s.Performers.Select(p => p.Performer.Name))),
+            "positions" => _sortAsc ? list.OrderBy(s => string.Join(", ", s.Positions)) : list.OrderByDescending(s => string.Join(", ", s.Positions)),
+            "locations" => _sortAsc ? list.OrderBy(s => string.Join(", ", s.Locations)) : list.OrderByDescending(s => string.Join(", ", s.Locations)),
+            _ => list.OrderBy(s => s.Title)
+        };
+        return sorted.OrderByDescending(s => s.IsDraft && s.IsPinnedDraft);
+    }
+
+    private int TotalPages() => Math.Max(1, (int)Math.Ceiling(Filtered().Count / (double)PageSize));
+
+    private IEnumerable<Scene> PageItems() =>
+        Sorted().Skip((_page - 1) * PageSize).Take(PageSize);
+
+    private void PrevPage() { if (_page > 1) _page--; }
+    private void NextPage() { if (_page < TotalPages()) _page++; }
+
+    private async Task ToggleDraftPin(int id)
+    {
+        await SceneService.ToggleDraftPinAsync(id);
+        await Reload();
+    }
+
+    private async Task Delete(int id, string title)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete scene \"{title}\"? This cannot be undone."))
+            return;
+        await SceneService.DeleteAsync(id);
+        await Reload();
+    }
+
+    private async Task OpenExport(int id)
+    {
+        var scene = await SceneService.GetAsync(id);
+        if (scene is null) return;
+        var performers = await PerformerService.GetAllAsync(includeArchived: true);
+        _exportText = BuildExportText(scene, performers);
+        _copied = false;
+        _exportOpen = true;
+    }
+
+    private void CloseExport()
+    {
+        _exportOpen = false;
+        _exportText = "";
+        _copied = false;
+    }
+
+    private async Task CopyExport()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _exportText);
+        _copied = true;
+        StateHasChanged();
+        await Task.Delay(1500);
+        _copied = false;
+        StateHasChanged();
+    }
+
+    private static string FormatRating(Rating? r, int mod)
+    {
+        if (r is null) return "—";
+        var prefix = mod switch
+        {
+            <= -2 => "-- ",
+            -1 => "- ",
+            1 => "+ ",
+            >= 2 => "++ ",
+            _ => ""
+        };
+        return $"{prefix}{r}";
+    }
+
+    private static string RatingClass(Rating? rating) => rating is null ? "rating-unset" : $"rating-{rating.ToString()!.ToLowerInvariant()}";
+
+    // ===== Export helpers =====
+
+    private static string RatingLabel(Rating? r, int mod)
+    {
+        if (r is null) return "unrated";
+        var name = r switch
+        {
+            Rating.Bad => "bad",
+            Rating.NotBad => "notbad",
+            Rating.Mid => "mid",
+            Rating.Good => "good",
+            Rating.Fav => "fav",
+            _ => "mid"
+        };
+        var suffix = mod switch
+        {
+            <= -2 => "--",
+            -1 => "-",
+            1 => "+",
+            >= 2 => "++",
+            _ => ""
+        };
+        return name + suffix;
+    }
+
+    public static string BuildExportText(Scene scene, List<Performer> allPerformers)
+    {
+        if (scene.IsDraft)
+        {
+            var draft = new StringBuilder();
+            draft.Append("Name: ").Append(scene.Title).Append('\n');
+            if (scene.ResumeAtSeconds is int resume) draft.Append("Continue at: ").Append(PlaybackPosition.Format(resume)).Append('\n');
+            if (!string.IsNullOrWhiteSpace(scene.Studio)) draft.Append("Studio: ").Append(scene.Studio).Append('\n');
+            if (scene.Performers.Count > 0)
+                draft.Append("Performers: ").Append(string.Join(", ", scene.Performers.Select(sp => allPerformers.FirstOrDefault(p => p.Id == sp.PerformerId)?.Name).Where(n => n is not null))).Append('\n');
+            if (scene.OverallRating.HasValue) draft.Append("Overall: ").Append(RatingLabel(scene.OverallRating, scene.OverallModifier)).Append('\n');
+            if (scene.SetupRating.HasValue) draft.Append("Setup rating: ").Append(RatingLabel(scene.SetupRating, scene.SetupModifier)).Append('\n');
+            if (scene.SexRating.HasValue) draft.Append("Sex rating: ").Append(RatingLabel(scene.SexRating, scene.SexModifier)).Append('\n');
+            if (scene.SetupSpeaksNoEnglish || !string.IsNullOrWhiteSpace(scene.SetupNotes))
+            {
+                draft.Append("\nSetup: ");
+                if (scene.SetupSpeaksNoEnglish) draft.Append("speak no english");
+                if (!string.IsNullOrWhiteSpace(scene.SetupNotes))
+                {
+                    if (scene.SetupSpeaksNoEnglish) draft.Append(", ");
+                    draft.Append(scene.SetupNotes.Trim());
+                }
+                draft.Append('\n');
+            }
+            if (!string.IsNullOrWhiteSpace(scene.SexNotes)) draft.Append("\nSex: ").Append(scene.SexNotes.Trim()).Append('\n');
+            if (!string.IsNullOrWhiteSpace(scene.Verdict)) draft.Append("\nVerdict: ").Append(scene.Verdict.Trim()).Append('\n');
+            if (scene.Positions.Count > 0) draft.Append("Positions: ").Append(string.Join(", ", scene.Positions)).Append('\n');
+            if (scene.Locations.Count > 0) draft.Append("Locations: ").Append(string.Join(", ", scene.Locations)).Append('\n');
+            if (!string.IsNullOrWhiteSpace(scene.Tags)) draft.Append("Tags: ").Append(scene.Tags.Trim()).Append('\n');
+            return draft.ToString();
+        }
+
+        var sb = new StringBuilder();
+
+        sb.Append("Name: ").Append(scene.Title).Append('\n');
+
+        var rating = RatingLabel(scene.OverallRating, scene.OverallModifier);
+        var povPart = scene.IsPov ? "POV -- " : "";
+        var verdict = scene.Verdict ?? "";
+        sb.Append(rating).Append(" -- ").Append(povPart).Append(verdict).Append(",\n");
+
+        var setupRating = RatingLabel(scene.SetupRating, scene.SetupModifier);
+        var setupNotes = scene.SetupNotes ?? "";
+        sb.Append("Setup: ");
+        if (scene.SetupSpeaksNoEnglish) sb.Append("speak no english, ");
+        sb.Append(setupRating).Append(", ").Append(setupNotes).Append(",\n");
+
+        sb.Append('\n');
+
+        var sexRating = RatingLabel(scene.SexRating, scene.SexModifier);
+        var sexParts = new List<string> { sexRating };
+        if (scene.Locations.Count > 0)
+            sexParts.AddRange(scene.Locations.Select(l => l.ToString()));
+        if (scene.Positions.Count > 0)
+            sexParts.AddRange(scene.Positions.Select(p => p.ToString()));
+        sb.Append("Sex: ").Append(string.Join(", ", sexParts)).Append(",\n");
+
+        if (!string.IsNullOrWhiteSpace(scene.SexNotes))
+            sb.Append(scene.SexNotes).Append(",\n");
+
+        sb.Append('\n');
+
+        var blocks = new List<string>();
+        foreach (var sp in scene.Performers)
+        {
+            var p = allPerformers.FirstOrDefault(x => x.Id == sp.PerformerId);
+            if (p is null) continue;
+            blocks.Add(BuildPerformerBlock(p, sp));
+        }
+
+        sb.Append(string.Join("\n\n", blocks));
+        sb.Append("\n\n\n");
+
+        return sb.ToString();
+    }
+
+    private static string BuildPerformerBlock(Performer p, ScenePerformer sp)
+    {
+        var lines = new List<string>();
+
+        var nameLine = p.Name + ":";
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(sp.Notes))
+            parts.Add($"({sp.Notes.Trim()})");
+        if (!string.IsNullOrWhiteSpace(p.Notes))
+            parts.Add(p.Notes);
+        if (parts.Count > 0)
+            nameLine += " " + string.Join(" ", parts);
+        nameLine += ",";
+        lines.Add(nameLine);
+
+        if (p.AgeCategory is { } age) lines.Add(PerformerAgeCategories.Label(age) + ",");
+        if (p.DoesNotSpeakEnglish) lines.Add("speak no english,");
+
+        var skin = FormatSkin(p, sp.SkinOverride);
+        if (skin is not null) lines.Add(skin);
+
+        var boobs = FormatBoobs(p, sp.BoobsOverride);
+        if (boobs is not null) lines.Add(boobs);
+
+        var ass = FormatAss(p, sp.AssOverride);
+        if (ass is not null) lines.Add(ass);
+
+        var bj = FormatBj(p, sp.BjOverride);
+        if (bj is not null) lines.Add(bj);
+
+        var moans = FormatMoans(p, sp.MoansOverride);
+        if (moans is not null) lines.Add(moans);
+
+        if (!string.IsNullOrWhiteSpace(p.BellyQuality)) lines.Add(p.BellyQuality.Trim() + " belly,");
+
+        return string.Join("\n", lines);
+    }
+
+    private static string? FormatSkin(Performer p, string? ov)
+    {
+        var skin = p.SkinColor?.Name;
+        if (string.IsNullOrWhiteSpace(skin)) return null;
+        var result = $"{skin} skin";
+        if (!string.IsNullOrWhiteSpace(ov))
+            result = $"({ov.Trim()}) {result}";
+        return result + ",";
+    }
+
+    private static string? FormatBoobs(Performer p, string? ov)
+    {
+        var letter = p.BoobSize?.Name;
+        var quality = p.BoobsQuality;
+
+        if (string.IsNullOrWhiteSpace(letter)) return null;
+
+        string? sizeWord = letter.ToUpperInvariant() switch
+        {
+            "A" or "B" => "small",
+            "C" or "D" => "medium",
+            "E" or "F" or "G" => "big",
+            _ => null
+        };
+
+        string core;
+        if (sizeWord is null)
+        {
+            core = string.IsNullOrWhiteSpace(quality)
+                ? $"boobs({letter})"
+                : $"{quality} boobs({letter})";
+        }
+        else
+        {
+            core = string.IsNullOrWhiteSpace(quality)
+                ? $"{sizeWord} boobs({letter})"
+                : $"{sizeWord} {quality} boobs({letter})";
+        }
+
+        if (!string.IsNullOrWhiteSpace(ov))
+            core = $"({ov.Trim()}) {core}";
+
+        return core + ",";
+    }
+
+    private static string? FormatAss(Performer p, string? ov)
+    {
+        var size = p.AssSize?.Name;
+        var quality = p.AssQuality;
+
+        if (string.IsNullOrWhiteSpace(size) && string.IsNullOrWhiteSpace(quality))
+            return null;
+
+        var inner = string.Join(" ", new[] { quality, size }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        var core = $"{inner} ass";
+
+        if (!string.IsNullOrWhiteSpace(ov))
+            core = $"({ov.Trim()}) {core}";
+
+        return core + ",";
+    }
+
+    private static string? FormatBj(Performer p, string? ov)
+    {
+        var quality = p.BjQuality;
+        var tags = string.Join(", ", p.BjTags.Select(t => t.Name));
+
+        if (string.IsNullOrWhiteSpace(quality) && string.IsNullOrWhiteSpace(tags))
+            return null;
+
+        var inner = string.Join(" ", new[] { quality, tags }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        string core;
+        if (!string.IsNullOrWhiteSpace(ov))
+            core = $"does ({ov.Trim()}) {inner} bj";
+        else
+            core = $"does {inner} bj";
+
+        return core + ",";
+    }
+
+    private static string? FormatMoans(Performer p, string? ov)
+    {
+        var moans = p.Moans;
+        if (string.IsNullOrWhiteSpace(moans) && string.IsNullOrWhiteSpace(ov))
+            return null;
+
+        if (!string.IsNullOrWhiteSpace(ov))
+            return $"({ov.Trim()}) {moans},";
+
+        return moans + ",";
+    }
+}

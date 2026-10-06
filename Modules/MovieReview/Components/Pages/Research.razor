@@ -1,0 +1,83 @@
+@rendermode InteractiveServer
+@page "/moviereview/research"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject ResearchService ResearchService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR LIBRARY / RESEARCH</div><h1>Research</h1><p>Keep your reference material organized.</p></div></div>
+
+<div class="row mb-3">
+    <div class="col-md-8">
+        <input class="form-control" placeholder="New research doc title..." @bind="_newTitle" @bind:event="oninput" />
+    </div>
+    <div class="col-md-2">
+        <input class="form-control" placeholder="Category" @bind="_newCategory" @bind:event="oninput" />
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100" @onclick="AddDoc">Add</button>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_docs.Count == 0)
+{
+    <div class="empty-state"><span>⌕</span><h3>No research docs yet</h3><p>Create one using the fields above.</p></div>
+}
+else
+{
+    @foreach (var doc in _docs)
+    {
+        <div class="card mb-3">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="/moviereview/research/@doc.Id" class="h5 text-decoration-none">@doc.Title</a>
+                    @if (!string.IsNullOrWhiteSpace(doc.Category))
+                    {
+                        <span class="badge bg-secondary ms-2">@doc.Category</span>
+                    }
+                </div>
+                <div>
+                    <a href="/moviereview/research/@doc.Id/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(doc.Id, doc.Title)">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<ResearchDoc> _docs = new();
+    private bool _loading = true;
+    private string _newTitle = "";
+    private string _newCategory = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _docs = await ResearchService.GetDocsAsync();
+        _loading = false;
+    }
+
+    private async Task AddDoc()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle)) return;
+        await ResearchService.AddDocAsync(_newTitle.Trim(), string.IsNullOrWhiteSpace(_newCategory) ? null : _newCategory.Trim());
+        _newTitle = "";
+        _newCategory = "";
+        await Reload();
+    }
+
+    private async Task Delete(int id, string title)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete research doc \"{title}\" and all its sections?"))
+            return;
+        await ResearchService.DeleteDocAsync(id);
+        await Reload();
+    }
+}

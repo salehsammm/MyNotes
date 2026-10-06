@@ -1,0 +1,136 @@
+@page "/moviereview/trophies"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject TrophyService TrophyService
+@inject IJSRuntime JS
+
+<PageTitle>Trophies · MovieReviews</PageTitle>
+
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / TROPHIES</div><h1>Trophy room</h1><p>Rank your favorites by category, with the reason and scene references together.</p></div><button type="button" class="btn btn-outline-secondary" @onclick="() => _showImport = !_showImport">Paste a chart</button></div>
+
+@if (_showImport)
+{
+    <section class="trophy-import"><div class="detail-section-title">IMPORT A CHART</div><p>Paste text with category headings, numbered entries, and optional <code>(ref: ...)</code> lines. Existing matching entries are skipped.</p><textarea class="form-control" rows="8" placeholder="Moan:&#10;1- Why this performer wins...&#10;(ref: Scene title)" @bind="_importText" @bind:event="oninput"></textarea><div class="d-flex align-items-center gap-3 mt-3"><button type="button" class="btn btn-primary" disabled="@string.IsNullOrWhiteSpace(_importText)" @onclick="Import">Import entries</button><span class="text-muted small">@_importFeedback</span></div></section>
+}
+
+<div class="trophy-toolbar"><input class="form-control" placeholder="Search categories, notes, or references..." @bind="_search" @bind:event="oninput" /><div class="input-group"><input class="form-control" placeholder="New category (e.g. Best moans)" @bind="_newCategoryName" @bind:event="oninput" /><button type="button" class="btn btn-primary" @onclick="AddCategory">Add category</button></div></div>
+
+@if (_loading)
+{
+    <p>Loading trophies...</p>
+}
+else if (_categories.Count == 0)
+{
+    <div class="empty-state"><span>★</span><h3>Your trophy room is ready</h3><p>Add a category or paste your chart to start ranking favorites.</p></div>
+}
+else if (FilteredCategories().Count == 0)
+{
+    <div class="empty-state"><span>⌕</span><h3>No matching trophies</h3><p>Try a different search.</p></div>
+}
+else
+{
+    <div class="trophy-list">
+        @foreach (var category in FilteredCategories())
+        {
+            <section class="trophy-category" @key="category.Id">
+                <div class="trophy-category-head"><div class="trophy-category-title"><span class="trophy-symbol">★</span><div>@if (_editingCategoryId == category.Id) { <input class="form-control" @bind="_editingCategoryName" @bind:event="oninput" /> } else { <h2>@category.Name</h2> }<small>@category.Entries.Count @((category.Entries.Count == 1) ? "winner" : "winners")</small></div></div><div class="trophy-category-actions">@if (_editingCategoryId == category.Id) { <button type="button" class="btn btn-sm btn-primary" @onclick="() => SaveCategory(category.Id)">Save</button><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelCategoryEdit">Cancel</button> } else { <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => StartCategoryEdit(category)">Rename</button><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCategory(category)">Delete</button> }</div></div>
+                <div class="trophy-entries">
+                    @foreach (var entry in VisibleEntries(category))
+                    {
+                        <article class="trophy-entry" @key="entry.Id"><div class="trophy-rank">@entry.Rank</div><div class="trophy-entry-body"><p>@entry.Description</p>@if (!string.IsNullOrWhiteSpace(entry.References)) { <div class="trophy-references"><span>SCENE REFERENCES</span>@foreach (var reference in entry.References.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <span class="mini-tag">@reference</span> }</div> }</div><div class="trophy-entry-actions"><button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => StartEntryEdit(category.Id, entry)">Edit</button><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEntry(entry)">Delete</button></div></article>
+                    }
+                    @if (_editorCategoryId == category.Id)
+                    {
+                        <div class="trophy-editor"><div class="detail-section-title">@(_editingEntryId == 0 ? "ADD A WINNER" : "EDIT WINNER")</div><div class="trophy-editor-grid"><label>Rank<input type="number" min="1" class="form-control" @bind="_entryRank" /></label><label>Why this wins<textarea rows="3" class="form-control" placeholder="Your thoughts..." @bind="_entryDescription" @bind:event="oninput"></textarea></label></div><label>Scene references <small>(separate multiple titles with commas)</small><textarea rows="2" class="form-control" placeholder="Scene title, Another scene" @bind="_entryReferences" @bind:event="oninput"></textarea></label><div class="d-flex gap-2 mt-3"><button type="button" class="btn btn-primary" disabled="@string.IsNullOrWhiteSpace(_entryDescription)" @onclick="SaveEntry">Save winner</button><button type="button" class="btn btn-outline-secondary" @onclick="CancelEntryEdit">Cancel</button></div></div>
+                    }
+                    else { <button type="button" class="trophy-add" @onclick="() => StartEntryEdit(category.Id, null)">+ Add a ranked winner</button> }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private List<TrophyCategory> _categories = new();
+    private bool _loading = true;
+    private string _search = "";
+    private string _newCategoryName = "";
+    private int _editingCategoryId;
+    private string _editingCategoryName = "";
+    private int _editorCategoryId;
+    private int _editingEntryId;
+    private int _entryRank = 1;
+    private string _entryDescription = "";
+    private string _entryReferences = "";
+    private bool _showImport;
+    private string _importText = "";
+    private string _importFeedback = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+    private async Task Reload()
+    {
+        _categories = await TrophyService.GetAllAsync();
+        _loading = false;
+    }
+
+    private List<TrophyCategory> FilteredCategories()
+    {
+        var q = _search.Trim();
+        if (q.Length == 0) return _categories;
+        return _categories.Where(c => c.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+            c.Entries.Any(e => e.Description.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                (e.References?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false))).ToList();
+    }
+    private IEnumerable<TrophyEntry> VisibleEntries(TrophyCategory category)
+    {
+        var q = _search.Trim();
+        return q.Length == 0 || category.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+            ? category.Entries
+            : category.Entries.Where(e => e.Description.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                (e.References?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
+    }
+    private async Task AddCategory()
+    {
+        await TrophyService.AddCategoryAsync(_newCategoryName);
+        _newCategoryName = "";
+        await Reload();
+    }
+    private void StartCategoryEdit(TrophyCategory category) { _editingCategoryId = category.Id; _editingCategoryName = category.Name; }
+    private void CancelCategoryEdit() { _editingCategoryId = 0; _editingCategoryName = ""; }
+    private async Task SaveCategory(int id) { await TrophyService.RenameCategoryAsync(id, _editingCategoryName); CancelCategoryEdit(); await Reload(); }
+    private async Task DeleteCategory(TrophyCategory category)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete '{category.Name}' and all its ranked entries?")) return;
+        await TrophyService.DeleteCategoryAsync(category.Id);
+        await Reload();
+    }
+    private void StartEntryEdit(int categoryId, TrophyEntry? entry)
+    {
+        _editorCategoryId = categoryId;
+        _editingEntryId = entry?.Id ?? 0;
+        _entryRank = entry?.Rank ?? ((_categories.FirstOrDefault(c => c.Id == categoryId)?.Entries.Select(e => e.Rank).DefaultIfEmpty().Max() ?? 0) + 1);
+        _entryDescription = entry?.Description ?? "";
+        _entryReferences = entry?.References ?? "";
+    }
+    private void CancelEntryEdit() { _editorCategoryId = 0; _editingEntryId = 0; _entryDescription = _entryReferences = ""; }
+    private async Task SaveEntry()
+    {
+        await TrophyService.SaveEntryAsync(_editingEntryId, _editorCategoryId, _entryRank, _entryDescription, _entryReferences);
+        CancelEntryEdit();
+        await Reload();
+    }
+    private async Task DeleteEntry(TrophyEntry entry)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete rank {entry.Rank} from this category?")) return;
+        await TrophyService.DeleteEntryAsync(entry.Id);
+        await Reload();
+    }
+    private async Task Import()
+    {
+        var result = await TrophyService.ImportTextAsync(_importText);
+        _importFeedback = $"Added {result.Categories} categories and {result.Entries} entries.";
+        _importText = "";
+        await Reload();
+    }
+}

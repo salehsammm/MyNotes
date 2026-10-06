@@ -1,0 +1,174 @@
+@rendermode InteractiveServer
+@page "/moviereview/options"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject LookupService LookupService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">PREFERENCES / OPTIONS</div><h1>Options</h1><p>Customize the labels used throughout your collection.</p></div></div>
+
+<div class="row">
+    <div class="col-md-3">
+        <h3>Skin colors</h3>
+        <EditForm Model="_newSkin" OnValidSubmit="AddSkin" FormName="addSkin">
+            <InputText @bind-Value="_newSkin" class="form-control mb-1" placeholder="New skin color" />
+            <button class="btn btn-sm btn-primary">Add</button>
+        </EditForm>
+        <ul class="list-group mt-2">
+            @foreach (var s in _skins)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    @s.Name
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSkin(s.Id, s.Name)">x</button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="col-md-3">
+        <h3>Boob sizes</h3>
+        <EditForm Model="_newBoob" OnValidSubmit="AddBoob" FormName="addBoob">
+            <InputText @bind-Value="_newBoob" class="form-control mb-1" placeholder="New boob size" />
+            <button class="btn btn-sm btn-primary">Add</button>
+        </EditForm>
+        <ul class="list-group mt-2">
+            @foreach (var s in _boobs)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    @s.Name
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteBoob(s.Id, s.Name)">x</button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="col-md-3">
+        <h3>Ass sizes</h3>
+        <EditForm Model="_newAss" OnValidSubmit="AddAss" FormName="addAss">
+            <InputText @bind-Value="_newAss" class="form-control mb-1" placeholder="New ass size" />
+            <button class="btn btn-sm btn-primary">Add</button>
+        </EditForm>
+        <ul class="list-group mt-2">
+            @foreach (var s in _asses)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    @s.Name
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAss(s.Id, s.Name)">x</button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="col-md-3">
+        <h3>BJ tags</h3>
+        <EditForm Model="_newBj" OnValidSubmit="AddBj" FormName="addBj">
+            <InputText @bind-Value="_newBj" class="form-control mb-1" placeholder="New BJ tag" />
+            <button class="btn btn-sm btn-primary">Add</button>
+        </EditForm>
+        <ul class="list-group mt-2">
+            @foreach (var s in _bjs)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    @s.Name
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteBj(s.Id, s.Name)">x</button>
+                </li>
+            }
+        </ul>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert alert-warning mt-3">@_message</div>
+}
+
+@code {
+    private List<SkinColor> _skins = new();
+    private List<BoobSize> _boobs = new();
+    private List<AssSize> _asses = new();
+    private List<BjTag> _bjs = new();
+
+    private string _newSkin = "";
+    private string _newBoob = "";
+    private string _newAss = "";
+    private string _newBj = "";
+    private string _message = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _skins = await LookupService.GetSkinColorsAsync();
+        _boobs = await LookupService.GetBoobSizesAsync();
+        _asses = await LookupService.GetAssSizesAsync();
+        _bjs = await LookupService.GetBjTagsAsync();
+    }
+
+    private async Task AddSkin()
+    {
+        if (string.IsNullOrWhiteSpace(_newSkin)) return;
+        await LookupService.AddSkinColorAsync(_newSkin.Trim());
+        _newSkin = "";
+        await Reload();
+    }
+
+    private async Task AddBoob()
+    {
+        if (string.IsNullOrWhiteSpace(_newBoob)) return;
+        await LookupService.AddBoobSizeAsync(_newBoob.Trim());
+        _newBoob = "";
+        await Reload();
+    }
+
+    private async Task AddAss()
+    {
+        if (string.IsNullOrWhiteSpace(_newAss)) return;
+        await LookupService.AddAssSizeAsync(_newAss.Trim());
+        _newAss = "";
+        await Reload();
+    }
+
+    private async Task AddBj()
+    {
+        if (string.IsNullOrWhiteSpace(_newBj)) return;
+        await LookupService.AddBjTagAsync(_newBj.Trim());
+        _newBj = "";
+        await Reload();
+    }
+
+    private async Task DeleteSkin(int id, string name)
+    {
+        if (await LookupService.IsSkinColorInUseAsync(id)) { _message = "Skin color is in use — cannot delete."; return; }
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete skin color \"{name}\"?")) return;
+        await LookupService.SoftDeleteSkinColorAsync(id);
+        _message = "";
+        await Reload();
+    }
+
+    private async Task DeleteBoob(int id, string name)
+    {
+        if (await LookupService.IsBoobSizeInUseAsync(id)) { _message = "Boob size is in use — cannot delete."; return; }
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete boob size \"{name}\"?")) return;
+        await LookupService.SoftDeleteBoobSizeAsync(id);
+        _message = "";
+        await Reload();
+    }
+
+    private async Task DeleteAss(int id, string name)
+    {
+        if (await LookupService.IsAssSizeInUseAsync(id)) { _message = "Ass size is in use — cannot delete."; return; }
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete ass size \"{name}\"?")) return;
+        await LookupService.SoftDeleteAssSizeAsync(id);
+        _message = "";
+        await Reload();
+    }
+
+    private async Task DeleteBj(int id, string name)
+    {
+        if (await LookupService.IsBjTagInUseAsync(id)) { _message = "BJ tag is in use — cannot delete."; return; }
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete BJ tag \"{name}\"?")) return;
+        await LookupService.SoftDeleteBjTagAsync(id);
+        _message = "";
+        await Reload();
+    }
+}

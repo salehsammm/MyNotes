@@ -1,0 +1,49 @@
+@page "/moviereview/scenes/{Id:int}/view"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject SceneService SceneService
+@inject PerformerService PerformerService
+
+<PageTitle>@(_scene?.Title ?? "Scene") · MovieReviews</PageTitle>
+
+@if (_loading)
+{
+    <p>Loading scene...</p>
+}
+else if (_scene is null)
+{
+    <div class="empty-state"><h3>Scene not found</h3><a href="/moviereview/scenes">Back to scenes</a></div>
+}
+else
+{
+    <div class="detail-top"><div><div class="eyebrow">YOUR COLLECTION / SCENE</div><h1>@_scene.Title</h1><div class="detail-meta"><span class="scene-status @(_scene.IsDraft ? "scene-status-draft" : "scene-status-complete")">@(_scene.IsDraft ? "Draft" : "Complete")</span>@if (!string.IsNullOrWhiteSpace(_scene.Studio)) { <a href="/moviereview/studios/@Uri.EscapeDataString(_scene.Studio)">@_scene.Studio</a> } <span>Updated @_scene.LastUpdate.ToLocalTime().ToString("MMM d, yyyy")</span></div></div><div class="detail-actions"><a href="/moviereview/scenes" class="btn btn-outline-secondary">← Scenes</a><a href="/moviereview/scenes/@Id" class="btn btn-primary">@(_scene.IsDraft ? "Continue review" : "Edit scene")</a></div></div>
+    @if (_scene.IsDraft && _scene.ResumeAtSeconds is int resume)
+    {
+        <div class="draft-playback"><div><strong>Continue watching at @PlaybackPosition.Format(resume)</strong><small>Your saved playback position for this draft.</small></div><a class="btn btn-primary btn-sm" href="/moviereview/scenes/@Id">Continue review</a></div>
+    }
+    <div class="detail-grid">
+        <section class="detail-card"><div class="detail-section-title">NOTEPAD ENTRY</div><pre class="notepad-entry">@_notepad</pre></section>
+        <aside class="detail-side"><div class="detail-card"><div class="detail-section-title">AT A GLANCE</div><div class="detail-facts"><div><span>Overall</span><strong class="rating-badge @RatingClass(_scene.OverallRating)">@RatingText(_scene.OverallRating)</strong></div><div><span>Setup</span><strong class="rating-badge @RatingClass(_scene.SetupRating)">@RatingText(_scene.SetupRating)</strong></div><div><span>Sex</span><strong class="rating-badge @RatingClass(_scene.SexRating)">@RatingText(_scene.SexRating)</strong></div><div><span>POV</span><strong>@(_scene.IsPov ? "Yes" : "No")</strong></div></div></div><div class="detail-card"><div class="detail-section-title">PERFORMERS</div><div class="tag-list">@foreach (var link in _scene.Performers) { <a class="mini-tag" href="/moviereview/performers/@link.PerformerId/view">@link.Performer.Name</a> }</div></div><div class="detail-card"><div class="detail-section-title">POSITIONS & LOCATIONS</div><div class="tag-list">@foreach (var p in _scene.Positions) { <span class="mini-tag">@p</span> } @foreach (var l in _scene.Locations) { <span class="mini-tag">@l</span> }</div></div>@if (!string.IsNullOrWhiteSpace(_scene.Tags)) { <div class="detail-card"><div class="detail-section-title">TAGS</div><div class="tag-list">@foreach (var tag in _scene.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <span class="mini-tag">@tag</span> }</div></div> }</aside>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Scene? _scene;
+    private string _notepad = "";
+    private bool _loading = true;
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _scene = await SceneService.GetAsync(Id);
+        if (_scene is not null)
+        {
+            var performers = await PerformerService.GetAllAsync(includeArchived: true);
+            _notepad = Scenes.BuildExportText(_scene, performers).TrimEnd();
+        }
+        _loading = false;
+    }
+    private static string RatingClass(Rating? rating) => rating is null ? "rating-unset" : $"rating-{rating.ToString()!.ToLowerInvariant()}";
+    private static string RatingText(Rating? rating) => rating?.ToString() ?? "Not rated";
+}

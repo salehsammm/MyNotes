@@ -1,0 +1,21 @@
+@page "/moviereview/watchlist"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject PerformerService PerformerService
+
+<PageTitle>Watchlist · MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / WATCHLIST</div><h1>Watchlist</h1><p>Performers you marked to revisit.</p></div><a class="btn btn-primary" href="/moviereview/performers">Browse performers</a></div>
+@if (_loading) { <p>Loading watchlist...</p> }
+else if (_performers.Count == 0) { <div class="empty-state"><span>☆</span><h3>Your watchlist is empty</h3><p>Flag performers from their edit page to see them here.</p></div> }
+else { <div class="collection-grid">@foreach (var p in _performers) { <a href="/moviereview/performers/@p.Id/view" class="collection-card"><span class="collection-icon">★</span><strong>@p.Name</strong><small>@string.Join(" · ", new[] { p.SkinColor?.Name, p.BoobSize?.Name is string size ? $"Size {size}" : null, p.BjQuality }.Where(x => !string.IsNullOrWhiteSpace(x)))</small><span class="collection-arrow">View profile →</span></a> }</div> }
+
+@code {
+    private bool _loading = true;
+    private List<Performer> _performers = new();
+    protected override async Task OnInitializedAsync()
+    {
+        _performers = (await PerformerService.GetAllAsync()).Where(p => p.IsWatchlisted).ToList();
+        _loading = false;
+    }
+}

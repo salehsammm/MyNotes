@@ -1,0 +1,12 @@
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar { width: 248px; flex: 0 0 248px; min-height: 100vh; position: sticky; top: 0; height: 100vh; background: #151a25; color: #fff; }
+.main-area { min-width: 0; flex: 1; }
+.topbar { height: 76px; padding: 0 clamp(24px, 4vw, 64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e9e6e0; background: #fbfaf7; }
+.topbar-label { color: #767b82; font-size: .84rem; font-weight: 600; letter-spacing: .01em; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d7975a; margin-right: 9px; }
+.topbar-action { color: #252a33; text-decoration: none; font-size: .84rem; font-weight: 700; padding: 9px 15px; border: 1px solid #dedbd4; border-radius: 9px; background: white; }
+.topbar-action:hover { background: #f1eee8; color: #151a25; }
+.content { max-width: 1560px; margin: 0 auto; padding: 40px clamp(24px, 4vw, 64px) 80px; }
+@media (max-width: 760px) { .app-shell { display: block; } .sidebar { position: relative; width: 100%; height: auto; min-height: 0; } .topbar { height: 58px; } .content { padding-top: 28px; } }
+#blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; background: #fff4de; padding: 12px 20px; box-shadow: 0 -2px 12px #0002; }
+#blazor-error-ui .dismiss { position: absolute; right: 16px; cursor: pointer; }

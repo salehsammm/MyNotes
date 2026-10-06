@@ -1,0 +1,18 @@
+.brand-wrap { padding: 30px 22px 28px; }
+.brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; font-weight: 750; font-size: 1.02rem; letter-spacing: -.03em; }
+.brand:hover { color: #fff; }
+.brand-mark { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 11px; background: #dfab79; color: #171b24; font-family: Georgia, serif; font-size: 1.6rem; font-weight: bold; }
+.brand-mark span { color: #fff; }
+.brand small { display: block; margin-top: 2px; color: #8e96a4; font-size: .55rem; letter-spacing: .19em; font-weight: 700; }
+.nav-scrollable { padding: 0 14px; overflow-y: auto; max-height: calc(100vh - 210px); }
+.nav-caption { padding: 12px 16px 10px; color: #737e90; font-size: .65rem; letter-spacing: .18em; font-weight: 800; }
+.nav-caption-secondary { margin-top: 21px; }
+.nav ::deep .nav-link { display: flex; align-items: center; gap: 14px; min-height: 43px; color: #b5bdc8; padding: 9px 15px; margin: 2px 0; border-radius: 9px; text-decoration: none; font-size: .9rem; font-weight: 550; transition: background .15s, color .15s; }
+.nav ::deep .nav-link:hover { background: #242b39; color: #fff; }
+.nav ::deep .nav-link.active { color: #fff; background: #303848; box-shadow: inset 3px 0 #e2a96f; }
+.nav-icon { display: inline-grid; place-items: center; width: 20px; font-size: 1.1rem; font-weight: 400; color: #c4a58a; }
+.sidebar-footer { position: absolute; bottom: 25px; left: 24px; right: 24px; display: flex; align-items: center; gap: 10px; color: #aeb6c1; font-size: .75rem; border-top: 1px solid #303643; padding-top: 20px; }
+.footer-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #303848; color: #e8b687; font-size: .66rem; font-weight: 800; }
+.sidebar-footer small { display: block; color: #737e90; font-size: .68rem; margin-top: 2px; }
+.nav-toggle, .nav-toggle-label { display: none; }
+@media (max-width: 760px) { .brand-wrap { padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; } .nav-toggle-label { display: flex; width: 35px; height: 35px; flex-direction: column; justify-content: center; gap: 5px; cursor: pointer; } .nav-toggle-label span { display: block; width: 22px; height: 2px; background: #fff; } .nav-scrollable { display: none; max-height: none; padding-bottom: 16px; } .brand-wrap:has(.nav-toggle:checked) + .nav-scrollable { display: block; } .sidebar-footer { display: none; } }

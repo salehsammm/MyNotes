@@ -1,0 +1,220 @@
+@rendermode InteractiveServer
+@page "/moviereview/guide"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject GuideService GuideService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR LIBRARY / GUIDE</div><h1>Guide</h1><p>Quick reference for the terms you use.</p></div></div>
+
+<input class="form-control mb-3" placeholder="Search words..." @bind="_search" @bind:event="oninput" />
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    @foreach (var sec in FilteredSections())
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    @if (_editingSectionId == sec.Id)
+                    {
+                        <input class="form-control form-control-sm d-inline-block me-2" style="width:200px"
+                               value="@_editSectionName" @oninput="e => _editSectionName = (string)e.Value!" />
+                        <input class="form-control form-control-sm d-inline-block me-2" style="width:60px"
+                               value="@_editSectionIcon" @oninput="e => _editSectionIcon = (string)e.Value!" />
+                        <button class="btn btn-sm btn-primary" @onclick="() => SaveSection(sec)">Save</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => _editingSectionId = 0">Cancel</button>
+                    }
+                    else
+                    {
+                        <strong>@sec.Icon @sec.Name</strong>
+                    }
+                </span>
+                <span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => StartEditSection(sec)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSection(sec.Id, sec.Name)">Delete</button>
+                </span>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @foreach (var item in FilteredItems(sec))
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-2">
+                            @if (_editingItemId == item.Id)
+                            {
+                                <input class="form-control form-control-sm" style="max-width:200px"
+                                       value="@_editItemText" @oninput="e => _editItemText = (string)e.Value!" />
+                                <input class="form-control form-control-sm" placeholder="description (optional)"
+                                       value="@_editItemDesc" @oninput="e => _editItemDesc = (string)e.Value!" />
+                                <button class="btn btn-sm btn-primary" @onclick="() => SaveItem(item)">Save</button>
+                                <button class="btn btn-sm btn-secondary" @onclick="() => _editingItemId = 0">Cancel</button>
+                            }
+                            else
+                            {
+                                <span class="flex-grow-1">
+                                    <strong>@item.Text</strong>
+                                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                                    {
+                                        <span class="text-muted"> — @item.Description</span>
+                                    }
+                                </span>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveItem(item.Id, true)" title="Up">↑</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => MoveItem(item.Id, false)" title="Down">↓</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => StartEditItem(item)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteItem(item.Id, item.Text)">x</button>
+                            }
+                        </li>
+                    }
+                </ul>
+
+                <div class="input-group input-group-sm mt-2">
+                    <input class="form-control" placeholder="New word..." @bind="_newItemText" @bind:event="oninput" />
+                    <input class="form-control" placeholder="description (optional)" @bind="_newItemDesc" @bind:event="oninput" />
+                    <button class="btn btn-primary" @onclick="() => AddItem(sec.Id)">Add</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <hr />
+    <h4>Add section</h4>
+    <div class="input-group input-group-sm mb-4" style="max-width:500px">
+        <input class="form-control" placeholder="Icon (emoji)" @bind="_newSectionIcon" @bind:event="oninput" />
+        <input class="form-control" placeholder="Section name" @bind="_newSectionName" @bind:event="oninput" />
+        <button class="btn btn-primary" @onclick="AddSection">Add</button>
+    </div>
+}
+
+@code {
+    private List<GuideSection> _sections = new();
+    private bool _loading = true;
+
+    private string _search = "";
+
+    private string _newSectionName = "";
+    private string _newSectionIcon = "";
+
+    private string _newItemText = "";
+    private string _newItemDesc = "";
+
+    private int _editingSectionId = 0;
+    private string _editSectionName = "";
+    private string _editSectionIcon = "";
+
+    private int _editingItemId = 0;
+    private string _editItemText = "";
+    private string _editItemDesc = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _sections = await GuideService.GetAllAsync();
+        _loading = false;
+    }
+
+    private List<GuideSection> FilteredSections()
+    {
+        if (string.IsNullOrWhiteSpace(_search))
+            return _sections;
+
+        return _sections
+            .Where(s => s.Items.Any(i => Matches(i)))
+            .ToList();
+    }
+
+    private List<GuideItem> FilteredItems(GuideSection s)
+    {
+        if (string.IsNullOrWhiteSpace(_search))
+            return s.Items;
+        return s.Items.Where(i => Matches(i)).ToList();
+    }
+
+    private bool Matches(GuideItem i)
+    {
+        var q = _search.Trim();
+        return i.Text.Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (i.Description?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private async Task AddSection()
+    {
+        if (string.IsNullOrWhiteSpace(_newSectionName)) return;
+        await GuideService.AddSectionAsync(_newSectionName.Trim(), _newSectionIcon.Trim());
+        _newSectionName = "";
+        _newSectionIcon = "";
+        await Reload();
+    }
+
+    private void StartEditSection(GuideSection s)
+    {
+        _editingSectionId = s.Id;
+        _editSectionName = s.Name;
+        _editSectionIcon = s.Icon;
+    }
+
+    private async Task SaveSection(GuideSection s)
+    {
+        if (string.IsNullOrWhiteSpace(_editSectionName)) return;
+        s.Name = _editSectionName.Trim();
+        s.Icon = _editSectionIcon.Trim();
+        await GuideService.UpdateSectionAsync(s);
+        _editingSectionId = 0;
+        await Reload();
+    }
+
+    private async Task DeleteSection(int id, string name)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete section \"{name}\" and all its items?"))
+            return;
+        await GuideService.DeleteSectionAsync(id);
+        await Reload();
+    }
+
+    private async Task AddItem(int sectionId)
+    {
+        if (string.IsNullOrWhiteSpace(_newItemText)) return;
+        await GuideService.AddItemAsync(sectionId, _newItemText.Trim(),
+            string.IsNullOrWhiteSpace(_newItemDesc) ? null : _newItemDesc.Trim());
+        _newItemText = "";
+        _newItemDesc = "";
+        await Reload();
+    }
+
+    private void StartEditItem(GuideItem i)
+    {
+        _editingItemId = i.Id;
+        _editItemText = i.Text;
+        _editItemDesc = i.Description ?? "";
+    }
+
+    private async Task SaveItem(GuideItem i)
+    {
+        if (string.IsNullOrWhiteSpace(_editItemText)) return;
+        i.Text = _editItemText.Trim();
+        i.Description = string.IsNullOrWhiteSpace(_editItemDesc) ? null : _editItemDesc.Trim();
+        await GuideService.UpdateItemAsync(i);
+        _editingItemId = 0;
+        await Reload();
+    }
+
+    private async Task DeleteItem(int id, string text)
+    {
+        var preview = text.Length > 40 ? text[..40] + "…" : text;
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete \"{preview}\"?"))
+            return;
+        await GuideService.DeleteItemAsync(id);
+        await Reload();
+    }
+
+    private async Task MoveItem(int id, bool up)
+    {
+        await GuideService.MoveItemAsync(id, up);
+        await Reload();
+    }
+}

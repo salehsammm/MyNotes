@@ -1,0 +1,36 @@
+@page "/moviereview/stats"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject SceneService SceneService
+
+<PageTitle>Stats · MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / INSIGHTS</div><h1>Collection stats</h1><p>A closer look at what you have reviewed.</p></div></div>
+@if (_loading) { <p>Loading stats...</p> }
+else if (_scenes.Count == 0) { <div class="empty-state"><span>▥</span><h3>Nothing to chart yet</h3><p>Stats will appear after you add a scene.</p><a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a></div> }
+else {
+    <div class="insight-grid">
+        <section class="detail-card"><div class="detail-section-title">MOST-WATCHED PERFORMERS</div>@if (_topPerformers.Count == 0) { <p class="text-muted">No performers linked yet.</p> } else { @foreach (var item in _topPerformers) { <a class="insight-row" href="/moviereview/performers/@item.Id/view"><span>@item.Name</span><strong>@item.Count scene@(@item.Count == 1 ? "" : "s")</strong></a> } }</section>
+        <section class="detail-card"><div class="detail-section-title">BEST POSITIONS</div>@if (_bestPositions.Count == 0) { <p class="text-muted">No positions recorded yet.</p> } else { @foreach (var item in _bestPositions) { <div class="insight-row"><span>@item.Position <small>· @item.Count scene@(@item.Count == 1 ? "" : "s")</small></span><strong>@item.Average.ToString("0.0") / 5</strong></div> } }</section>
+        <section class="detail-card"><div class="detail-section-title">RATING DISTRIBUTION</div>@foreach (var rating in Enum.GetValues<Rating>().Reverse()) { var count = _scenes.Count(s => s.OverallRating == rating); <div class="distribution-row"><span class="rating-badge @RatingClass(rating)">@rating</span><div class="distribution-track"><div style="width:@(100.0 * count / _scenes.Count)%"></div></div><strong>@count</strong></div> }</section>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Scene> _scenes = new();
+    private List<(int Id, string Name, int Count)> _topPerformers = new();
+    private List<(Position Position, int Count, double Average)> _bestPositions = new();
+    protected override async Task OnInitializedAsync()
+    {
+        _scenes = (await SceneService.GetAllAsync()).Where(s => !s.IsDraft).ToList();
+        _topPerformers = _scenes.SelectMany(s => s.Performers).GroupBy(sp => sp.PerformerId)
+            .Select(g => (Id: g.Key, Name: g.First().Performer.Name, Count: g.Count()))
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Name).Take(10).ToList();
+        _bestPositions = _scenes.Where(s => s.OverallRating.HasValue).SelectMany(s => s.Positions.Distinct().Select(p => (Position: p, Score: Math.Clamp((int)s.OverallRating!.Value + 1 + s.OverallModifier * .2, 1, 5))))
+            .GroupBy(x => x.Position).Select(g => (Position: g.Key, Count: g.Count(), Average: g.Average(x => x.Score)))
+            .OrderByDescending(x => x.Average).ThenByDescending(x => x.Count).ToList();
+        _loading = false;
+    }
+    private static string RatingClass(Rating rating) => $"rating-{rating.ToString().ToLowerInvariant()}";
+}

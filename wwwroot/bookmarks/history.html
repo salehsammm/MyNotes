@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101416">
+  <title>History · BookmarkCounter</title>
+  <link rel="stylesheet" href="/bookmarks/css/app.css?v=6">
+  <script src="/bookmarks/js/history.js" defer></script>
+</head>
+<body>
+  <nav aria-label="MyNotes modules" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/" style="color:#eee">MyNotes</a><a href="/moviereview" style="color:#eee">MovieReview</a><a href="/bookmarks" style="color:#bce29a">BookmarkCounter</a></nav>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="/bookmarks" aria-label="BookmarkCounter home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 4.5h12v15l-6-4-6 4v-15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+        <span>Bookmark<span class="brand-light">Counter</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="nav-link" href="/bookmarks">Overview</a>
+        <a class="nav-link" href="/bookmarks/questions">Questions</a>
+        <a class="nav-link active" href="/bookmarks/history" aria-current="page">History <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main class="history-main">
+      <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Your progress</div>
+      <div class="history-heading"><div><h1>Bookmark history</h1><p>See how your watch later list changes over time.</p></div><button class="primary-button" id="logButton" type="button">Log count now <span aria-hidden="true">↗</span></button></div>
+      <section class="history-card" aria-label="Bookmark history chart">
+        <div class="history-toolbar"><div><span class="chart-label">BOOKMARKS OVER TIME</span><div class="history-current" id="currentValue">—</div><div class="history-change" id="changeValue">Waiting for data</div></div><div class="range-control" role="group" aria-label="History range"><button type="button" data-days="7">7 days</button><button type="button" data-days="30" class="selected" aria-pressed="true">30 days</button><button type="button" data-days="90">90 days</button></div></div>
+        <div class="chart-wrap"><svg id="historyChart" role="img" aria-label="Bookmark count over time"></svg><div class="chart-message" id="chartMessage" role="status">Loading history…</div></div>
+      </section>
+      <p class="history-note">A lower count means your backlog is getting smaller. Counts are logged automatically every hour.</p>
+    </main>
+    <footer class="site-footer">A calmer way to clear the queue.</footer>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

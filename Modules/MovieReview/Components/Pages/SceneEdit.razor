@@ -1,0 +1,854 @@
+@rendermode InteractiveServer
+@page "/moviereview/scenes/new"
+@page "/moviereview/scenes/{Id:int}"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject SceneService SceneService
+@inject PerformerService PerformerService
+@inject LookupService LookupService
+@inject StudioService StudioService
+@inject GuideService GuideService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<SceneEdit> Logger
+
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / SCENES</div><h1>@(Id == 0 ? "New scene review" : "Edit scene review")</h1><p>Save a draft at any point, then return when you are ready to finish.</p></div></div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_scene is null)
+{
+    <p>Scene not found. <a href="/moviereview/scenes">Back to list</a></p>
+}
+else
+{
+    <EditForm Model="_scene" OnSubmit="SaveCurrent" FormName="sceneForm">
+        <div class="scene-editor-status" role="status"><span class="scene-status @(_scene.IsDraft ? "scene-status-draft" : "scene-status-complete")">@(_scene.IsDraft ? "Draft" : "Complete")</span><span>@(_scene.IsDraft ? "Your notes can stay unfinished. Ratings are optional until you complete the review." : "This review is complete. You can move it back to drafts if you want to revisit it.")</span></div>
+        @if (_scene.IsDraft)
+        {
+            <div class="draft-playback">
+                <div><label for="resumeAt">Continue watching at</label><small>Save where you stopped so you can resume later.</small></div>
+                <input id="resumeAt" class="form-control" type="text" inputmode="numeric" placeholder="mm:ss or hh:mm:ss" @bind="_resumeTimeText" @bind:event="oninput" />
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(_saveError))
+        {
+            <div class="alert alert-danger" role="alert">@_saveError</div>
+        }
+        <div class="mb-2">
+            <label>Title <span class="text-danger">*</span></label>
+            <InputText @bind-Value="_scene.Title" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>Studio</label>
+            <div class="input-group">
+                <InputSelect @bind-Value="_scene.Studio" class="form-control">
+                    <option value="">-- no studio --</option>
+                    @foreach (var studio in _studios)
+                    {
+                        <option value="@studio.Name">@studio.Name</option>
+                    }
+                </InputSelect>
+                <button type="button" class="btn btn-outline-primary" @onclick="OpenNewStudio">New studio</button>
+            </div>
+        </div>
+
+        <hr />
+
+        <h4 class="d-flex align-items-center" style="cursor: pointer;" @onclick="() => _showOverall = !_showOverall">
+            <span class="me-2">@(_showOverall ? "▼" : "▶")</span> Overall
+        </h4>
+
+        @if (_showOverall)
+        {
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label>Rating</label>
+                    <InputSelect @bind-Value="_scene.OverallRating" class="form-control">
+                        <option value="">Not rated yet</option>
+                        @foreach (var r in Enum.GetValues<Rating>())
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label>Modifier (-2 .. +2)</label>
+                    <InputNumber @bind-Value="_scene.OverallModifier" class="form-control" />
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="_scene.IsPov" class="form-check-input" />
+                        <label class="form-check-label">POV</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <label>Verdict (one-liner)</label>
+                <InputText @bind-Value="_scene.Verdict" class="form-control" />
+            </div>
+
+            <div class="mb-2">
+                <label>Tags (comma-separated)</label>
+                <InputText @bind-Value="_scene.Tags" class="form-control" />
+            </div>
+        }
+
+        <hr />
+
+        <h4 class="d-flex align-items-center" style="cursor: pointer;" @onclick="() => _showSetup = !_showSetup">
+            <span class="me-2">@(_showSetup ? "▼" : "▶")</span> Setup
+        </h4>
+
+        @if (_showSetup)
+        {
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label>Rating</label>
+                    <InputSelect @bind-Value="_scene.SetupRating" class="form-control">
+                        <option value="">Not rated yet</option>
+                        @foreach (var r in Enum.GetValues<Rating>())
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label>Modifier (-2 .. +2)</label>
+                    <InputNumber @bind-Value="_scene.SetupModifier" class="form-control" />
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="_scene.SetupSpeaksNoEnglish" class="form-check-input" />
+                        <label class="form-check-label">Speak no English</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <label>Setup notes</label>
+                <InputTextArea @bind-Value="_scene.SetupNotes" class="form-control" rows="4" />
+            </div>
+        }
+
+        <hr />
+
+        <h4 class="d-flex align-items-center" style="cursor: pointer;" @onclick="() => _showSex = !_showSex">
+            <span class="me-2">@(_showSex ? "▼" : "▶")</span> Sex
+        </h4>
+
+        @if (_showSex)
+        {
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label>Rating</label>
+                    <InputSelect @bind-Value="_scene.SexRating" class="form-control">
+                        <option value="">Not rated yet</option>
+                        @foreach (var r in Enum.GetValues<Rating>())
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label>Modifier (-2 .. +2)</label>
+                    <InputNumber @bind-Value="_scene.SexModifier" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <label>Sex notes</label>
+                <InputTextArea @bind-Value="_scene.SexNotes" class="form-control" rows="4" />
+            </div>
+
+            <div class="mb-2">
+                <label>Positions</label>
+                <div>
+                    @foreach (var pos in Enum.GetValues<Position>())
+                    {
+                        <div class="form-check form-check-inline">
+                            <input type="checkbox" class="form-check-input"
+                                   checked="@_scene.Positions.Contains(pos)"
+                                   @onchange="e => TogglePosition(pos, (bool)e.Value!)" />
+                            <label class="form-check-label">@pos</label>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <label>Locations</label>
+                <div>
+                    @foreach (var loc in Enum.GetValues<Location>())
+                    {
+                        <div class="form-check form-check-inline">
+                            <input type="checkbox" class="form-check-input"
+                                   checked="@_scene.Locations.Contains(loc)"
+                                   @onchange="e => ToggleLocation(loc, (bool)e.Value!)" />
+                            <label class="form-check-label">@loc</label>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <hr />
+
+        <h4 class="d-flex align-items-center" style="cursor: pointer;" @onclick="() => _showPerformers = !_showPerformers">
+            <span class="me-2">@(_showPerformers ? "▼" : "▶")</span> Performers
+        </h4>
+
+        @if (_showPerformers)
+        {
+            <div class="mb-2">
+                <label>Add performer</label>
+                <input class="form-control mb-2" type="search" placeholder="Search performers by name..." aria-label="Search performers" @bind="_performerSearch" @bind:event="oninput" @bind:after="OnPerformerSearchChanged" />
+                <div class="input-group">
+                    <InputSelect @bind-Value="_performerToAdd" class="form-control">
+                        <option value="0">@(_performerSearch.Length == 0 ? "-- select --" : "-- select a match --")</option>
+                        @foreach (var p in MatchingPerformers())
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </InputSelect>
+                    <button type="button" class="btn btn-secondary" @onclick="AddPerformer">Add</button>
+                    <button type="button" class="btn btn-outline-primary" @onclick="OpenNewPerformer">New performer</button>
+                </div>
+                @if (_performerSearch.Length > 0 && MatchingPerformers().Count == 0)
+                {
+                    <small class="text-muted">No available performers match that name.</small>
+                }
+            </div>
+
+            @foreach (var sp in _scene.Performers)
+            {
+                var pid = sp.PerformerId;
+                var perf = _allPerformers.FirstOrDefault(p => p.Id == pid);
+                var skinDefault = perf?.SkinColor?.Name;
+                var boobsDefault = perf?.BoobSize?.Name;
+                var assDefault = perf?.AssSize?.Name;
+                var bjDefault = BjTagsPlaceholder(perf);
+                var moansDefault = perf?.Moans;
+
+                <div class="card mb-2" @key="sp.PerformerId">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <strong>@perf?.Name</strong>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                        @onclick="() => OpenEditPerformer(pid)">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger"
+                                        @onclick="() => RemovePerformer(sp)">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-1">
+                                <label>Skin override</label>
+                                <InputText @bind-Value="sp.SkinOverride"
+                                           class="@OverrideInputClass(sp.SkinOverride, skinDefault)" />
+                                <small class="text-muted">default: @(skinDefault ?? "—")</small>
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label>Boobs override</label>
+                                <InputText @bind-Value="sp.BoobsOverride"
+                                           class="@OverrideInputClass(sp.BoobsOverride, boobsDefault)" />
+                                <small class="text-muted">default: @(boobsDefault ?? "—")</small>
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label>Ass override</label>
+                                <InputText @bind-Value="sp.AssOverride"
+                                           class="@OverrideInputClass(sp.AssOverride, assDefault)" />
+                                <small class="text-muted">default: @(assDefault ?? "—")</small>
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label>BJ override</label>
+                                <InputText @bind-Value="sp.BjOverride"
+                                           class="@OverrideInputClass(sp.BjOverride, bjDefault)" />
+                                <small class="text-muted">default: @(bjDefault ?? "—")</small>
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label>Moans override</label>
+                                <InputText @bind-Value="sp.MoansOverride"
+                                           class="@OverrideInputClass(sp.MoansOverride, moansDefault)" />
+                                <small class="text-muted">default: @(moansDefault ?? "—")</small>
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label>Notes</label>
+                                <InputText @bind-Value="sp.Notes" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        <hr />
+
+        <div class="scene-editor-actions">
+            <button type="button" class="btn btn-primary" @onclick="CompleteReview" disabled="@_saving">@(_scene.IsDraft ? "Complete review" : "Save review")</button>
+            <button type="submit" class="btn btn-outline-secondary" disabled="@_saving">@(_scene.IsDraft ? "Save draft" : "Save changes")</button>
+            @if (!_scene.IsDraft && _scene.Id != 0)
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="MoveToDraft" disabled="@_saving">Move to drafts</button>
+            }
+            <a href="/moviereview/scenes" class="btn btn-link">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@if (_newStudioOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">New studio</h5><button type="button" class="btn-close" disabled="@_savingStudio" @onclick="CloseNewStudio" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <label for="newStudioName">Studio name</label>
+                    <input id="newStudioName" class="form-control" maxlength="450" @bind="_newStudioName" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_studioError)) { <div class="alert alert-danger mt-2 mb-0" role="alert">@_studioError</div> }
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" disabled="@_savingStudio" @onclick="CloseNewStudio">Cancel</button><button type="button" class="btn btn-primary" disabled="@_savingStudio" @onclick="SaveNewStudio">@(_savingStudio ? "Saving..." : "Add studio")</button></div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_editingPerformer is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @(_editingPerformer.Id == 0 ? "New performer" : $"Edit performer: {_editingPerformer.Name}")
+                    </h5>
+                    <button type="button" class="btn-close" disabled="@_savingPerformer" @onclick="CloseEditPerformer"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(_performerError))
+                    {
+                        <div class="alert alert-danger" role="alert">@_performerError</div>
+                    }
+                    <div class="mb-2">
+                        <label>Name</label>
+                        <input class="form-control" @bind="_editingPerformer.Name" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Skin color</label>
+                        <select class="form-control" @bind="_editingPerformer.SkinColorId">
+                            <option value="">-- none --</option>
+                            @foreach (var s in _skinColors)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Boob size</label>
+                        <select class="form-control" @bind="_editingPerformer.BoobSizeId">
+                            <option value="">-- none --</option>
+                            @foreach (var s in _boobSizes)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Boobs quality</label>
+                        <input class="form-control" @bind="_editingPerformer.BoobsQuality" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Ass size</label>
+                        <select class="form-control" @bind="_editingPerformer.AssSizeId">
+                            <option value="">-- none --</option>
+                            @foreach (var s in _assSizes)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Ass quality</label>
+                        <input class="form-control" @bind="_editingPerformer.AssQuality" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>BJ quality</label>
+                        <input class="form-control" @bind="_editingPerformer.BjQuality" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>BJ tags</label>
+                        <div>
+                            @foreach (var t in _bjTags)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input type="checkbox" class="form-check-input"
+                                           checked="@IsBjCheckedModal(t.Id)"
+                                           @onchange="e => ToggleBjModal(t, (bool)e.Value!)" />
+                                    <label class="form-check-label">@t.Name</label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Moans</label>
+                        <input class="form-control" @bind="_editingPerformer.Moans" />
+                    </div>
+
+                    <div class="mb-2">
+                        <label>Notes</label>
+                        <textarea class="form-control" rows="3" @bind="_editingPerformer.Notes"></textarea>
+                    </div>
+
+                    <h5 class="d-flex align-items-center mt-3" style="cursor:pointer;" @onclick="() => _showExtraModal = !_showExtraModal">
+                        <span class="me-2">@(_showExtraModal ? "▼" : "▶")</span> Extra details
+                    </h5>
+
+                    @if (_showExtraModal)
+                    {
+                        <div class="mb-2">
+                            <label>Age category</label>
+                            <select class="form-control" @bind="_editingPerformer.AgeCategory">
+                                <option value="">-- select --</option>
+                                @foreach (var category in Enum.GetValues<PerformerAgeCategory>())
+                                {
+                                    <option value="@category">@PerformerAgeCategories.Label(category)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2 form-check">
+                            <input type="checkbox" class="form-check-input" @bind="_editingPerformer.DoesNotSpeakEnglish" />
+                            <label class="form-check-label">Does not speak English</label>
+                        </div>
+                        <div class="mb-2">
+                            <label>Face quality</label>
+                            <input class="form-control" @bind="_editingPerformer.FaceQuality" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Body size</label>
+                            <input class="form-control" @bind="_editingPerformer.BodySize" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Body quality</label>
+                            <input class="form-control" @bind="_editingPerformer.BodyQuality" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Belly quality</label>
+                            <input class="form-control" @bind="_editingPerformer.BellyQuality" />
+                        </div>
+                        <div class="mb-2">
+                            <label>Leg quality</label>
+                            <input class="form-control" @bind="_editingPerformer.LegQuality" />
+                        </div>
+                    }
+
+                    <div class="mb-2 form-check mt-3">
+                        <input type="checkbox" class="form-check-input" @bind="_editingPerformer.IsWatchlisted" />
+                        <label class="form-check-label">Watchlist</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" disabled="@_savingPerformer" @onclick="CloseEditPerformer">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@_savingPerformer" @onclick="SaveEditingPerformer">@(_savingPerformer ? "Saving..." : _editingPerformer.Id == 0 && _addNewToScene ? "Save and add" : "Save")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<button type="button" class="vocab-fab" @onclick="ToggleVocabulary" aria-expanded="@_vocabularyOpen">📖 Vocabulary</button>
+@if (_vocabularyOpen)
+{
+    <aside class="vocab-panel" aria-label="Vocabulary guide">
+        <div class="vocab-panel-head"><div><div class="eyebrow">QUICK REFERENCE</div><h3>Vocabulary</h3></div><button type="button" class="btn-close" @onclick="ToggleVocabulary" aria-label="Close vocabulary"></button></div>
+        <input class="form-control mb-3" placeholder="Search words..." @bind="_vocabularySearch" @bind:event="oninput" />
+        @if (_vocabularyLoading) { <p>Loading guide...</p> }
+        else if (FilteredGuide().Count == 0) { <p class="text-muted">No matching words.</p> }
+        else { @foreach (var group in FilteredGuide()) { <div class="vocab-section"><h4>@group.Icon @group.Name</h4>@foreach (var item in group.Items.Where(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description) || MatchesVocabulary(group.Name))) { <div class="vocab-entry"><strong>@item.Text</strong>@if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }</div> }</div> } }
+    </aside>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Scene? _scene;
+    private bool _loading = true;
+    private bool _saving;
+    private string? _saveError;
+    private string _resumeTimeText = "";
+
+    private List<Performer> _allPerformers = new();
+    private List<Studio> _studios = new();
+    private bool _newStudioOpen;
+    private string _newStudioName = "";
+    private string? _studioError;
+    private bool _savingStudio;
+    private List<Performer> _availablePerformers = new();
+    private int _performerToAdd;
+    private string _performerSearch = "";
+    private string? _performerError;
+    private bool _savingPerformer;
+
+    private List<SkinColor> _skinColors = new();
+    private List<BoobSize> _boobSizes = new();
+    private List<AssSize> _assSizes = new();
+    private List<BjTag> _bjTags = new();
+
+    private Performer? _editingPerformer;
+    private bool _addNewToScene;
+
+    private bool _showOverall = false;
+    private bool _showSetup = false;
+    private bool _showSex = false;
+    private bool _showPerformers = false;
+    private bool _showExtraModal = false;
+
+    private DotNetObjectReference<SceneEdit>? _objRef;
+    private bool _jsRegistered;
+    private bool _vocabularyOpen;
+    private bool _vocabularyLoading;
+    private string _vocabularySearch = "";
+    private List<GuideSection> _guideSections = new();
+
+    private async Task ToggleVocabulary()
+    {
+        _vocabularyOpen = !_vocabularyOpen;
+        if (_vocabularyOpen && _guideSections.Count == 0)
+        {
+            _vocabularyLoading = true;
+            _guideSections = await GuideService.GetAllAsync();
+            _vocabularyLoading = false;
+        }
+    }
+
+    private bool MatchesVocabulary(string? value) => string.IsNullOrWhiteSpace(_vocabularySearch) ||
+        (value?.Contains(_vocabularySearch.Trim(), StringComparison.OrdinalIgnoreCase) ?? false);
+
+    private List<GuideSection> FilteredGuide() => _guideSections.Where(s =>
+        MatchesVocabulary(s.Name) || s.Items.Any(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description))).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+
+        _allPerformers = await PerformerService.GetAllAsync(includeArchived: true);
+        _studios = await StudioService.GetAllAsync();
+        _skinColors = await LookupService.GetSkinColorsAsync();
+        _boobSizes = await LookupService.GetBoobSizesAsync();
+        _assSizes = await LookupService.GetAssSizesAsync();
+        _bjTags = await LookupService.GetBjTagsAsync();
+
+        if (Id == 0)
+        {
+            _scene = new Scene { IsDraft = true };
+        }
+        else
+        {
+            _scene = await SceneService.GetAsync(Id);
+            if (!string.IsNullOrWhiteSpace(_scene?.Studio) && !_studios.Any(s => string.Equals(s.Name, _scene.Studio, StringComparison.OrdinalIgnoreCase)))
+                _studios.Add(new Studio { Name = _scene.Studio });
+        }
+
+        RefreshAvailable();
+		_resumeTimeText = _scene?.ResumeAtSeconds is int seconds ? PlaybackPosition.Format(seconds) : "";
+
+        _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_jsRegistered)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("ctrlS.register", "sceneEdit", _objRef, nameof(TriggerSave), nameof(TriggerEsc));
+            _jsRegistered = true;
+        }
+    }
+
+    [Microsoft.JSInterop.JSInvokable]
+    public async Task TriggerSave()
+    {
+        if (_newStudioOpen) await SaveNewStudio();
+        else if (_editingPerformer is not null) await SaveEditingPerformer();
+        else if (_scene is not null) await SaveCurrent();
+    }
+
+    [Microsoft.JSInterop.JSInvokable]
+    public async Task TriggerEsc()
+    {
+        if (_newStudioOpen)
+        {
+            CloseNewStudio();
+            StateHasChanged();
+            return;
+        }
+        if (_editingPerformer is not null)
+        {
+            CloseEditPerformer();
+            StateHasChanged();
+            return;
+        }
+        await Task.CompletedTask;
+        Nav.NavigateTo("/moviereview/scenes");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsRegistered)
+        {
+            try { await JS.InvokeVoidAsync("ctrlS.unregister", "sceneEdit"); } catch { }
+            _jsRegistered = false;
+        }
+        _objRef?.Dispose();
+    }
+
+    private void RefreshAvailable()
+    {
+        if (_scene is null) { _availablePerformers = new(); return; }
+        var used = _scene.Performers.Select(sp => sp.PerformerId).ToHashSet();
+        _availablePerformers = _allPerformers.Where(p => !p.IsArchived && !used.Contains(p.Id)).ToList();
+    }
+
+    private List<Performer> MatchingPerformers() => _availablePerformers
+        .Where(p => p.Name.Contains(_performerSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private void OnPerformerSearchChanged() => _performerToAdd = 0;
+
+    private void OpenNewStudio()
+    {
+        _newStudioName = "";
+        _studioError = null;
+        _newStudioOpen = true;
+    }
+
+    private void CloseNewStudio()
+    {
+        if (_savingStudio) return;
+        _newStudioOpen = false;
+        _studioError = null;
+    }
+
+    private async Task SaveNewStudio()
+    {
+        if (_scene is null || _savingStudio) return;
+        _savingStudio = true;
+        _studioError = null;
+        try
+        {
+            var studio = await StudioService.AddAsync(_newStudioName);
+            _studios.RemoveAll(s => string.Equals(s.Name, studio.Name, StringComparison.OrdinalIgnoreCase));
+            _studios.Add(studio);
+            _studios = _studios.OrderBy(s => s.Name).ToList();
+            _scene.Studio = studio.Name;
+            _newStudioOpen = false;
+        }
+        catch (InvalidOperationException ex) { _studioError = ex.Message; }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to add studio from scene editor");
+            _studioError = "Could not save the studio. Please try again.";
+        }
+        finally { _savingStudio = false; }
+    }
+
+    private void AddPerformer()
+    {
+        if (_scene is null || _performerToAdd == 0) return;
+        _scene.Performers.Add(new ScenePerformer { PerformerId = _performerToAdd });
+        _performerToAdd = 0;
+        _performerSearch = "";
+        RefreshAvailable();
+    }
+
+    private void RemovePerformer(ScenePerformer sp)
+    {
+        if (_scene is null) return;
+        _scene.Performers.Remove(sp);
+        RefreshAvailable();
+    }
+
+    private void TogglePosition(Position pos, bool on)
+    {
+        if (_scene is null) return;
+        if (on && !_scene.Positions.Contains(pos)) _scene.Positions.Add(pos);
+        else if (!on) _scene.Positions.Remove(pos);
+    }
+
+    private void ToggleLocation(Location loc, bool on)
+    {
+        if (_scene is null) return;
+        if (on && !_scene.Locations.Contains(loc)) _scene.Locations.Add(loc);
+        else if (!on) _scene.Locations.Remove(loc);
+    }
+
+    private static string? BjTagsPlaceholder(Performer? p)
+    {
+        if (p is null || p.BjTags.Count == 0) return null;
+        return string.Join(", ", p.BjTags.Select(t => t.Name));
+    }
+
+    private static bool IsOverridden(string? overrideValue, string? defaultValue)
+    {
+        if (string.IsNullOrWhiteSpace(overrideValue)) return false;
+        var o = overrideValue.Trim();
+        var d = (defaultValue ?? "").Trim();
+        return !string.Equals(o, d, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string OverrideInputClass(string? overrideValue, string? defaultValue)
+    {
+        var baseClass = "form-control form-control-sm";
+        return IsOverridden(overrideValue, defaultValue)
+            ? baseClass + " border-warning bg-warning-subtle"
+            : baseClass;
+    }
+
+    private async Task OpenEditPerformer(int performerId)
+    {
+        _editingPerformer = await PerformerService.GetAsync(performerId);
+        _performerError = null;
+        _addNewToScene = false;
+        _showExtraModal = false;
+    }
+
+    private void OpenNewPerformer()
+    {
+        _editingPerformer = new Performer();
+        _performerError = null;
+        _addNewToScene = true;
+        _showExtraModal = false;
+    }
+
+    private void CloseEditPerformer()
+    {
+        if (_savingPerformer) return;
+        _editingPerformer = null;
+        _performerError = null;
+        _addNewToScene = false;
+        _showExtraModal = false;
+    }
+
+    private bool IsBjCheckedModal(int id) =>
+        _editingPerformer?.BjTags.Any(t => t.Id == id) == true;
+
+    private void ToggleBjModal(BjTag tag, bool isChecked)
+    {
+        if (_editingPerformer is null) return;
+        var existing = _editingPerformer.BjTags.FirstOrDefault(t => t.Id == tag.Id);
+        if (isChecked && existing is null) _editingPerformer.BjTags.Add(tag);
+        else if (!isChecked && existing is not null) _editingPerformer.BjTags.Remove(existing);
+    }
+
+    private async Task SaveEditingPerformer()
+    {
+        if (_editingPerformer is null || _savingPerformer) return;
+
+        _savingPerformer = true;
+        _performerError = null;
+        try
+        {
+            var saved = _editingPerformer;
+            if (saved.Id == 0)
+            {
+                await PerformerService.AddAsync(saved);
+                if (_scene is not null && _addNewToScene)
+                    _scene.Performers.Add(new ScenePerformer { PerformerId = saved.Id });
+            }
+            else await PerformerService.UpdateAsync(saved);
+
+            var refreshed = await PerformerService.GetAsync(saved.Id);
+            if (refreshed is not null)
+            {
+                var index = _allPerformers.FindIndex(p => p.Id == refreshed.Id);
+                if (index >= 0) _allPerformers[index] = refreshed;
+                else _allPerformers.Add(refreshed);
+                _allPerformers.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+            }
+            RefreshAvailable();
+            _editingPerformer = null;
+            _addNewToScene = false;
+            _showExtraModal = false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _performerError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save performer from scene editor");
+            _performerError = "Could not save the performer. Please try again.";
+        }
+        finally
+        {
+            _savingPerformer = false;
+        }
+    }
+
+    private Task SaveCurrent() => Save(_scene?.IsDraft ?? true);
+
+    private Task CompleteReview() => Save(false);
+
+    private Task MoveToDraft() => Save(true);
+
+    private async Task Save(bool asDraft)
+    {
+        if (_scene is null || _saving) return;
+
+        _saveError = null;
+        _scene.Title = _scene.Title.Trim();
+        if (_scene.Title.Length == 0)
+        {
+            _saveError = "Enter a title before saving this scene.";
+            return;
+        }
+        if (!PlaybackPosition.TryParse(_resumeTimeText, out var resumeSeconds))
+        {
+            _saveError = "Enter the playback time as mm:ss or hh:mm:ss (for example 12:34 or 1:12:34).";
+            return;
+        }
+        _scene.ResumeAtSeconds = resumeSeconds;
+        if (!asDraft && (_scene.OverallRating is null || _scene.SetupRating is null || _scene.SexRating is null))
+        {
+            _saveError = "Choose overall, setup, and sex ratings before completing the review. You can save a draft without them.";
+            return;
+        }
+
+        _saving = true;
+        _scene.IsDraft = asDraft;
+
+        try
+        {
+            if (_scene.Id == 0)
+                await SceneService.AddAsync(_scene);
+            else
+                await SceneService.UpdateAsync(_scene);
+            Nav.NavigateTo("/moviereview/scenes");
+        }
+        catch
+        {
+            _saveError = "Could not save this scene. Please try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

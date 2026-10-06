@@ -1,0 +1,252 @@
+@rendermode InteractiveServer
+@page "/moviereview/research/{Id:int}/edit"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject ResearchService ResearchService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_doc is null)
+{
+    <p>Doc not found. <a href="/moviereview/research">Back</a></p>
+}
+else
+{
+    <h1>Edit: @_doc.Title</h1>
+
+    <div class="mb-3">
+        <label>Title</label>
+        <input class="form-control" @bind="_title" @bind:event="oninput" />
+    </div>
+    <div class="mb-3">
+        <label>Category</label>
+        <input class="form-control" @bind="_category" @bind:event="oninput" />
+    </div>
+    <button class="btn btn-primary mb-4" @onclick="SaveDoc">Save doc</button>
+    <a href="/moviereview/research/@_doc.Id" class="btn btn-secondary ms-2 mb-4">View</a>
+
+    <hr />
+
+    <h3>Sections</h3>
+
+    @if (_sections.Count == 0)
+    {
+        <p>No sections yet. Use the "Add top-level section" bar below.</p>
+    }
+
+    @foreach (var row in Flatten(null, 0))
+    {
+        var sec = row.Section;
+        var depth = row.Depth;
+        <div class="card mb-2" style="margin-left:@(depth * 24)px">
+            <div class="card-body">
+                @if (_editingId == sec.Id)
+                {
+                    <input class="form-control mb-1" @bind="_editHeading" @bind:event="oninput" placeholder="Heading" />
+                    <input class="form-control mb-1" @bind="_editWeight" @bind:event="oninput" placeholder="Weight (optional)" />
+                    <textarea class="form-control mb-1" rows="10" @bind="_editBody" @bind:event="oninput" placeholder="Body (Markdown supported)"></textarea>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => SaveSection(sec)">Save</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => _editingId = 0">Cancel</button>
+                }
+                else
+                {
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>@sec.Heading</strong>
+                            @if (!string.IsNullOrWhiteSpace(sec.Weight))
+                            {
+                                <span class="badge bg-info text-dark ms-2">@sec.Weight</span>
+                            }
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => Move(sec.Id, true)">↑</button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => Move(sec.Id, false)">↓</button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => Indent(sec.Id)">→</button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => Outdent(sec.Id)">←</button>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => StartEdit(sec)">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSection(sec.Id, sec.Heading)">x</button>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(sec.Body))
+                    {
+                        <div class="text-muted small mt-1">
+                            @(sec.Body.Length > 160 ? sec.Body.Substring(0, 160) + "..." : sec.Body)
+                        </div>
+                    }
+
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenInlineAdd(sec.Id)">
+                            + sub-section
+                        </button>
+
+                        @if (_inlineAddParentId == sec.Id)
+                        {
+                            <div class="input-group input-group-sm mt-2">
+                                <input class="form-control" placeholder="Heading" @bind="_inlineHeading" @bind:event="oninput" />
+                                <input class="form-control" style="max-width:120px" placeholder="Weight" @bind="_inlineWeight" @bind:event="oninput" />
+                                <button class="btn btn-primary" @onclick="() => ConfirmInlineAdd(sec.Id)">Add</button>
+                                <button class="btn btn-secondary" @onclick="CloseInlineAdd">Cancel</button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <hr />
+    <h4>Add top-level section</h4>
+    <div class="input-group mb-4" style="max-width:800px">
+        <input class="form-control" placeholder="Heading" @bind="_newHeading" @bind:event="oninput" />
+        <input class="form-control" style="max-width:120px" placeholder="Weight" @bind="_newWeight" @bind:event="oninput" />
+        <button class="btn btn-primary" @onclick="() => AddSection(null)">Add</button>
+    </div>
+
+    @if (_message is not null)
+    {
+        <div class="alert alert-info">@_message</div>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ResearchDoc? _doc;
+    private List<ResearchSection> _sections = new();
+    private bool _loading = true;
+
+    private string _title = "";
+    private string _category = "";
+
+    private string _newHeading = "";
+    private string _newWeight = "";
+
+    private int _editingId = 0;
+    private string _editHeading = "";
+    private string _editWeight = "";
+    private string _editBody = "";
+
+    private int _inlineAddParentId = 0;
+    private string _inlineHeading = "";
+    private string _inlineWeight = "";
+
+    private string? _message;
+
+    private record Row(ResearchSection Section, int Depth);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _doc = await ResearchService.GetDocAsync(Id);
+        if (_doc is not null)
+        {
+            _title = _doc.Title;
+            _category = _doc.Category ?? "";
+            _sections = await ResearchService.GetSectionsAsync(Id);
+        }
+        _loading = false;
+    }
+
+    private List<Row> Flatten(int? parentId, int depth)
+    {
+        var result = new List<Row>();
+        foreach (var s in _sections.Where(x => x.ParentId == parentId).OrderBy(x => x.SortOrder))
+        {
+            result.Add(new Row(s, depth));
+            result.AddRange(Flatten(s.Id, depth + 1));
+        }
+        return result;
+    }
+
+    private async Task SaveDoc()
+    {
+        if (_doc is null) return;
+        _doc.Title = _title.Trim();
+        _doc.Category = string.IsNullOrWhiteSpace(_category) ? null : _category.Trim();
+        await ResearchService.UpdateDocAsync(_doc);
+        _message = "Saved.";
+    }
+
+    private async Task AddSection(int? parentId)
+    {
+        if (string.IsNullOrWhiteSpace(_newHeading)) return;
+        await ResearchService.AddSectionAsync(Id, parentId, _newHeading.Trim(),
+            string.IsNullOrWhiteSpace(_newWeight) ? null : _newWeight.Trim(), "");
+        _newHeading = "";
+        _newWeight = "";
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private void OpenInlineAdd(int parentId)
+    {
+        _inlineAddParentId = parentId;
+        _inlineHeading = "";
+        _inlineWeight = "";
+    }
+
+    private void CloseInlineAdd()
+    {
+        _inlineAddParentId = 0;
+        _inlineHeading = "";
+        _inlineWeight = "";
+    }
+
+    private async Task ConfirmInlineAdd(int parentId)
+    {
+        if (string.IsNullOrWhiteSpace(_inlineHeading)) return;
+        await ResearchService.AddSectionAsync(Id, parentId, _inlineHeading.Trim(),
+            string.IsNullOrWhiteSpace(_inlineWeight) ? null : _inlineWeight.Trim(), "");
+        CloseInlineAdd();
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private void StartEdit(ResearchSection s)
+    {
+        _editingId = s.Id;
+        _editHeading = s.Heading;
+        _editWeight = s.Weight ?? "";
+        _editBody = s.Body;
+    }
+
+    private async Task SaveSection(ResearchSection s)
+    {
+        s.Heading = _editHeading.Trim();
+        s.Weight = string.IsNullOrWhiteSpace(_editWeight) ? null : _editWeight.Trim();
+        s.Body = _editBody;
+        await ResearchService.UpdateSectionAsync(s);
+        _editingId = 0;
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private async Task DeleteSection(int id, string heading)
+    {
+        var preview = heading.Length > 40 ? heading[..40] + "…" : heading;
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete section \"{preview}\" and all its sub-sections?"))
+            return;
+        await ResearchService.DeleteSectionAsync(id);
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private async Task Move(int id, bool up)
+    {
+        await ResearchService.MoveSectionAsync(id, up);
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private async Task Indent(int id)
+    {
+        await ResearchService.IndentAsync(id);
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+
+    private async Task Outdent(int id)
+    {
+        await ResearchService.OutdentAsync(id);
+        _sections = await ResearchService.GetSectionsAsync(Id);
+    }
+}

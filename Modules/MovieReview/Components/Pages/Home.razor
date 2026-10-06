@@ -1,0 +1,74 @@
+@page "/moviereview"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Overview · MovieReviews</PageTitle>
+
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / OVERVIEW</div><h1>Good to have you back.</h1><p>Pick up where you left off, or add something new to your collection.</p></div></div>
+
+<section class="dashboard-hero">
+    <div class="hero-content"><span class="hero-kicker">YOUR CREATIVE SPACE</span><h2>Every scene has<br />a story worth keeping.</h2><p>Organize reviews, capture ideas, and keep your favorites close.</p><div class="hero-actions"><a href="/moviereview/scenes/new" class="btn btn-light">+ Write a review</a><a href="/moviereview/scenes" class="hero-link">Explore collection <span>→</span></a></div></div>
+    <div class="hero-art" aria-hidden="true"><div class="film-ring ring-one"></div><div class="film-ring ring-two"></div><div class="hero-card"><span>✦</span><i></i><i></i><i></i></div></div>
+</section>
+
+@if (!_loading && _draftCount > 0)
+{
+    <div class="draft-reminder"><div><strong>@_draftCount unfinished scene @(_draftCount == 1 ? "review" : "reviews")</strong><span>Your drafts are saved and ready when you are.</span></div><a href="/moviereview/scenes?status=draft" class="btn btn-outline-secondary">Continue drafts →</a></div>
+}
+
+<div class="dashboard-stats">
+    <a href="/moviereview/scenes" class="stat-card"><div class="stat-icon peach">▣</div><span>SCENES REVIEWED</span><strong>@(_loading ? "—" : _sceneCount)</strong><small>Browse your reviews →</small></a>
+    <a href="/moviereview/performers" class="stat-card"><div class="stat-icon lavender">♙</div><span>PERFORMERS</span><strong>@(_loading ? "—" : _performerCount)</strong><small>View your collection →</small></a>
+    <a href="/moviereview/ideas" class="stat-card"><div class="stat-icon mint">✧</div><span>OPEN IDEAS</span><strong>@(_loading ? "—" : _ideaCount)</strong><small>Keep creating →</small></a>
+    <a href="/moviereview/notes" class="stat-card"><div class="stat-icon blue">▤</div><span>NOTES SAVED</span><strong>@(_loading ? "—" : _noteCount)</strong><small>Open your notes →</small></a>
+</div>
+
+<div class="dashboard-grid">
+    <section class="dashboard-panel">
+        <div class="panel-header"><div><div class="eyebrow">PICK UP WHERE YOU LEFT OFF</div><h3>Recent reviews</h3></div><a href="/moviereview/scenes">View all →</a></div>
+        @if (_loading)
+        {
+            <p class="panel-empty">Loading your reviews...</p>
+        }
+        else if (_sceneCount == 0)
+        {
+            <div class="panel-empty"><span class="empty-symbol">▣</span><strong>Your collection starts here</strong><p>Add your first scene review to see it here.</p><a href="/moviereview/scenes/new" class="btn btn-primary btn-sm">Create a review</a></div>
+        }
+        else
+        {
+            @foreach (var scene in _recentScenes)
+            {
+                <a href="/moviereview/scenes/@scene.Id/view" class="recent-row"><span class="recent-thumb">▣</span><span class="recent-detail"><strong>@scene.Title</strong><small>@(string.IsNullOrWhiteSpace(scene.Studio) ? "Scene review" : scene.Studio)</small></span><span class="recent-date">@scene.LastUpdate.ToLocalTime().ToString("MMM d")</span><span class="recent-arrow">→</span></a>
+            }
+        }
+    </section>
+    <section class="dashboard-panel quick-panel"><div class="panel-header"><div><div class="eyebrow">MAKE IT YOURS</div><h3>Quick actions</h3></div></div><a href="/moviereview/performers/new" class="quick-link"><span class="quick-icon lavender">♙</span><span><strong>Add a performer</strong><small>Grow your collection</small></span><span>→</span></a><a href="/moviereview/notes/new" class="quick-link"><span class="quick-icon blue">▤</span><span><strong>Write a note</strong><small>Save a thought for later</small></span><span>→</span></a><a href="/moviereview/ideas" class="quick-link"><span class="quick-icon mint">✧</span><span><strong>Capture an idea</strong><small>Keep inspiration close</small></span><span>→</span></a></section>
+</div>
+
+@code {
+    private bool _loading = true;
+    private int _sceneCount;
+    private int _draftCount;
+    private int _performerCount;
+    private int _ideaCount;
+    private int _noteCount;
+    private List<Scene> _recentScenes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _sceneCount = await db.Scenes.CountAsync(s => !s.IsDraft);
+        _draftCount = await db.Scenes.CountAsync(s => s.IsDraft);
+        _performerCount = await db.Performers.CountAsync(p => !p.IsArchived);
+        _ideaCount = await db.Ideas.CountAsync(i => !i.IsDone);
+        _noteCount = await db.Notes.CountAsync();
+        _recentScenes = await db.Scenes.AsNoTracking().Where(s => !s.IsDraft)
+            .OrderByDescending(s => s.LastUpdate)
+            .Take(4)
+            .Select(s => new Scene { Id = s.Id, Title = s.Title, Studio = s.Studio, LastUpdate = s.LastUpdate })
+            .ToListAsync();
+        _loading = false;
+    }
+}

@@ -1,0 +1,25 @@
+@page "/moviereview/studios/{Name}"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject SceneService SceneService
+
+<PageTitle>@Name · Studios</PageTitle>
+<div class="detail-top"><div><div class="eyebrow">YOUR COLLECTION / STUDIO</div><h1>@Name</h1><p class="text-muted">@_scenes.Count scene@(_scenes.Count == 1 ? "" : "s") in this studio</p></div><a href="/moviereview/studios" class="btn btn-outline-secondary">← All studios</a></div>
+@if (_loading) { <p>Loading scenes...</p> }
+else if (_scenes.Count == 0) { <div class="empty-state"><h3>No scenes found</h3><p>This studio has no matching reviews.</p></div> }
+else { <div class="detail-card">@foreach (var scene in _scenes) { <a class="detail-scene-row" href="/moviereview/scenes/@scene.Id/view"><span><strong>@scene.Title</strong><small>@string.Join(", ", scene.Performers.Select(p => p.Performer.Name))</small></span><span class="rating-badge @RatingClass(scene.OverallRating)">@(scene.OverallRating?.ToString() ?? "Draft")</span><span>→</span></a> }</div> }
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    private bool _loading = true;
+    private List<Scene> _scenes = new();
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _scenes = (await SceneService.GetAllAsync()).Where(s => string.Equals(s.Studio?.Trim(), Name, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(s => s.LastUpdate).ToList();
+        _loading = false;
+    }
+    private static string RatingClass(Rating? rating) => rating is null ? "rating-unset" : $"rating-{rating.ToString()!.ToLowerInvariant()}";
+}

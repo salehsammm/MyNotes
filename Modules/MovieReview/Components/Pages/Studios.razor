@@ -1,0 +1,32 @@
+@page "/moviereview/studios"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject SceneService SceneService
+@inject StudioService StudioService
+
+<PageTitle>Studios · MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / STUDIOS</div><h1>Studios</h1><p>Explore reviews by studio.</p></div></div>
+@if (_loading) { <p>Loading studios...</p> }
+else if (_studios.Count == 0) { <div class="empty-state"><span>◈</span><h3>No studios yet</h3><p>Define one while editing a scene to see it here.</p></div> }
+else { <div class="collection-grid">@foreach (var studio in _studios) { <a href="/moviereview/studios/@Uri.EscapeDataString(studio.Name)" class="collection-card"><span class="collection-icon">◈</span><strong>@studio.Name</strong><small>@studio.Count scene@(@studio.Count == 1 ? "" : "s")</small><span class="collection-arrow">View scenes →</span></a> }</div> }
+
+@code {
+    private bool _loading = true;
+    private List<(string Name, int Count)> _studios = new();
+    protected override async Task OnInitializedAsync()
+    {
+        var definitions = await StudioService.GetAllAsync();
+        var scenes = await SceneService.GetAllAsync();
+        var counts = new Dictionary<string, (string Name, int Count)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var studio in definitions) counts[studio.Name] = (studio.Name, 0);
+        foreach (var scene in scenes.Where(s => !string.IsNullOrWhiteSpace(s.Studio)))
+        {
+            var name = scene.Studio!.Trim();
+            if (counts.TryGetValue(name, out var current)) counts[name] = (current.Name, current.Count + 1);
+            else counts[name] = (name, 1);
+        }
+        _studios = counts.Values.OrderBy(x => x.Name).ToList();
+        _loading = false;
+    }
+}

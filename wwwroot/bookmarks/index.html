@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101416">
+  <title>Overview · BookmarkCounter</title>
+  <link rel="stylesheet" href="/bookmarks/css/app.css?v=6">
+  <script src="/bookmarks/js/dashboard.js?v=6" defer></script>
+</head>
+<body>
+  <nav aria-label="MyNotes modules" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/" style="color:#eee">MyNotes</a><a href="/moviereview" style="color:#eee">MovieReview</a><a href="/bookmarks" style="color:#bce29a">BookmarkCounter</a></nav>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="/bookmarks" aria-label="BookmarkCounter home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 4.5h12v15l-6-4-6 4v-15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+        <span>Bookmark<span class="brand-light">Counter</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="nav-link active" href="/bookmarks" aria-current="page">Overview</a>
+        <a class="nav-link" href="/bookmarks/questions">Questions</a>
+        <a class="nav-link" href="/bookmarks/history">History <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Live tracker</div>
+          <h1 id="hero-title">A little less to watch later.</h1>
+          <p>Keep your bookmark backlog in sight, one day at a time.</p>
+        </div>
+        <div class="count-card">
+          <div class="card-topline"><span id="folderName">Bookmark folder</span><span class="small-icon" aria-hidden="true">↗</span></div>
+          <div class="count-value" id="bookmarkCount" aria-live="polite">—</div>
+          <div class="count-footer"><span>bookmarks remaining</span><span class="status" id="countStatus">Connecting…</span></div>
+        </div>
+      </section>
+
+      <section class="workspace" aria-labelledby="checklist-title">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow muted">Your rhythm</div>
+            <h2 id="checklist-title">Checklist</h2>
+            <p>Small steps add up. Track what you finish each day and week.</p>
+          </div>
+          <div class="date-nav" aria-label="Choose checklist date">
+            <button class="icon-button" id="previousDay" type="button" aria-label="Previous day">←</button>
+            <div class="date-label" id="dateLabel" aria-live="polite"></div>
+            <button class="icon-button" id="nextDay" type="button" aria-label="Next day">→</button>
+          </div>
+        </div>
+        <div class="viewing-row"><span id="viewingHint">Viewing today</span><div class="date-actions"><label for="jumpDate">Jump to date</label><input id="jumpDate" type="date"><button class="text-button" id="todayButton" type="button" hidden>Back to today</button></div></div>
+        <div class="checklist-grid">
+          <section class="list-panel" aria-labelledby="dailyTitle">
+            <div class="list-header"><div class="list-title"><span class="list-icon daily-icon" aria-hidden="true">☀</span><div><h3 id="dailyTitle">Daily</h3><p>Make progress today</p></div></div><span class="progress-summary" id="dailySummary">—</span></div>
+            <div class="progress-track" aria-hidden="true"><div id="dailyProgress"></div></div>
+            <div class="reset-line" id="dailyReset"></div>
+            <div class="item-list" id="dailyItems" aria-live="polite"></div>
+            <button class="add-button" type="button" data-add="Daily"><span aria-hidden="true">＋</span> Add daily item</button>
+          </section>
+          <section class="list-panel" aria-labelledby="weeklyTitle">
+            <div class="list-header"><div class="list-title"><span class="list-icon weekly-icon" aria-hidden="true">◷</span><div><h3 id="weeklyTitle">Weekly</h3><p>Stay consistent this week</p></div></div><span class="progress-summary" id="weeklySummary">—</span></div>
+            <div class="progress-track" aria-hidden="true"><div id="weeklyProgress"></div></div>
+            <div class="reset-line" id="weeklyReset"></div>
+            <div class="item-list" id="weeklyItems" aria-live="polite"></div>
+            <button class="add-button" type="button" data-add="Weekly"><span aria-hidden="true">＋</span> Add weekly item</button>
+          </section>
+        </div>
+        <section class="missed-panel" aria-labelledby="missedTitle">
+          <div class="missed-heading"><div><h3 id="missedTitle">Missed tasks</h3><p>Unfinished tasks from past days and weeks. You can still complete them here.</p></div><span class="progress-summary" id="missedSummary">—</span></div>
+          <div class="missed-list" id="missedItems" aria-live="polite"></div>
+        </section>
+        <section class="questions-preview" aria-labelledby="questionsPreviewTitle">
+          <div class="missed-heading"><div><h3 id="questionsPreviewTitle">Questions</h3><p>Curiosities waiting for an answer, at your own pace.</p></div><a class="text-button" href="/bookmarks/questions">View all questions →</a></div>
+          <div class="question-counts" id="questionCounts">Loading questions…</div>
+          <div class="question-preview-list" id="questionPreviewList"></div>
+        </section>
+      </section>
+    </main>
+    <footer class="site-footer">A calmer way to clear the queue.</footer>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

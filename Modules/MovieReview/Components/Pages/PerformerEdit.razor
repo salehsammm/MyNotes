@@ -1,0 +1,265 @@
+@rendermode InteractiveServer
+@page "/moviereview/performers/new"
+@page "/moviereview/performers/{Id:int}"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject PerformerService PerformerService
+@inject LookupService LookupService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<h1>@(Id == 0 ? "New performer" : "Edit performer")</h1>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_performer is null)
+{
+    <p>Performer not found. <a href="/moviereview/performers">Back to list</a></p>
+}
+else
+{
+    <EditForm Model="_performer" OnValidSubmit="Save" FormName="performerForm">
+        @if (_performer.IsArchived)
+        {
+            <div class="alert alert-warning">This performer is archived. Restore them from the Archived tab to add them to new scenes.</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(_saveError))
+        {
+            <div class="alert alert-danger" role="alert">@_saveError</div>
+        }
+        <div class="mb-2">
+            <label>Name <span class="text-danger">*</span></label>
+            <InputText @bind-Value="_performer.Name" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>Skin color</label>
+            <InputSelect @bind-Value="_performer.SkinColorId" class="form-control">
+                <option value="">-- none --</option>
+                @foreach (var s in _skinColors)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-2">
+            <label>Boob size</label>
+            <InputSelect @bind-Value="_performer.BoobSizeId" class="form-control">
+                <option value="">-- none --</option>
+                @foreach (var s in _boobSizes)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-2">
+            <label>Boobs quality</label>
+            <InputText @bind-Value="_performer.BoobsQuality" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>Ass size</label>
+            <InputSelect @bind-Value="_performer.AssSizeId" class="form-control">
+                <option value="">-- none --</option>
+                @foreach (var s in _assSizes)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-2">
+            <label>Ass quality</label>
+            <InputText @bind-Value="_performer.AssQuality" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>BJ quality</label>
+            <InputText @bind-Value="_performer.BjQuality" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>BJ tags</label>
+            <div>
+                @foreach (var t in _bjTags)
+                {
+                    <div class="form-check form-check-inline">
+                        <input type="checkbox" class="form-check-input"
+                               checked="@IsBjChecked(t.Id)"
+                               @onchange="e => ToggleBj(t, (bool)e.Value!)" />
+                        <label class="form-check-label">@t.Name</label>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <label>Moans</label>
+            <InputText @bind-Value="_performer.Moans" class="form-control" />
+        </div>
+
+        <div class="mb-2">
+            <label>Notes</label>
+            <InputTextArea @bind-Value="_performer.Notes" class="form-control" rows="3" />
+        </div>
+
+        <h5 class="d-flex align-items-center mt-3" style="cursor:pointer;" @onclick="() => _showExtra = !_showExtra">
+            <span class="me-2">@(_showExtra ? "▼" : "▶")</span> Extra details
+        </h5>
+
+        @if (_showExtra)
+        {
+            <div class="mb-2">
+                <label>Age category</label>
+                <InputSelect @bind-Value="_performer.AgeCategory" class="form-control">
+                    <option value="">-- select --</option>
+                    @foreach (var category in Enum.GetValues<PerformerAgeCategory>())
+                    {
+                        <option value="@category">@PerformerAgeCategories.Label(category)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-2 form-check">
+                <InputCheckbox @bind-Value="_performer.DoesNotSpeakEnglish" class="form-check-input" />
+                <label class="form-check-label">Does not speak English</label>
+            </div>
+            <div class="mb-2">
+                <label>Face quality</label>
+                <InputText @bind-Value="_performer.FaceQuality" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <label>Body size</label>
+                <InputText @bind-Value="_performer.BodySize" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <label>Body quality</label>
+                <InputText @bind-Value="_performer.BodyQuality" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <label>Belly quality</label>
+                <InputText @bind-Value="_performer.BellyQuality" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <label>Leg quality</label>
+                <InputText @bind-Value="_performer.LegQuality" class="form-control" />
+            </div>
+        }
+
+        <div class="mb-2 form-check mt-3">
+            <InputCheckbox @bind-Value="_performer.IsWatchlisted" class="form-check-input" />
+            <label class="form-check-label">Watchlist</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="/moviereview/performers" class="btn btn-secondary ms-2">Back</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Performer? _performer;
+    private bool _loading = true;
+    private string? _saveError;
+
+    private List<SkinColor> _skinColors = new();
+    private List<BoobSize> _boobSizes = new();
+    private List<AssSize> _assSizes = new();
+    private List<BjTag> _bjTags = new();
+
+    private bool _showExtra = false;
+
+    private DotNetObjectReference<PerformerEdit>? _objRef;
+    private bool _jsRegistered;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+
+        _skinColors = await LookupService.GetSkinColorsAsync();
+        _boobSizes = await LookupService.GetBoobSizesAsync();
+        _assSizes = await LookupService.GetAssSizesAsync();
+        _bjTags = await LookupService.GetBjTagsAsync();
+
+        if (Id == 0)
+        {
+            _performer = new Performer();
+        }
+        else
+        {
+            _performer = await PerformerService.GetAsync(Id);
+        }
+
+        _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_jsRegistered)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("ctrlS.register", "performerEdit", _objRef, nameof(TriggerSave), nameof(TriggerEsc));
+            _jsRegistered = true;
+        }
+    }
+
+    [Microsoft.JSInterop.JSInvokable]
+    public async Task TriggerSave()
+    {
+        if (_performer is null) return;
+        await Save();
+    }
+
+    [Microsoft.JSInterop.JSInvokable]
+    public Task TriggerEsc()
+    {
+        Nav.NavigateTo("/moviereview/performers");
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsRegistered)
+        {
+            try { await JS.InvokeVoidAsync("ctrlS.unregister", "performerEdit"); } catch { }
+            _jsRegistered = false;
+        }
+        _objRef?.Dispose();
+    }
+
+    private bool IsBjChecked(int id) =>
+        _performer?.BjTags.Any(t => t.Id == id) == true;
+
+    private void ToggleBj(BjTag tag, bool isChecked)
+    {
+        if (_performer is null) return;
+        var existing = _performer.BjTags.FirstOrDefault(t => t.Id == tag.Id);
+        if (isChecked && existing is null) _performer.BjTags.Add(tag);
+        else if (!isChecked && existing is not null) _performer.BjTags.Remove(existing);
+    }
+
+    private async Task Save()
+    {
+        if (_performer is null) return;
+
+        _saveError = null;
+        try
+        {
+            if (_performer.Id == 0)
+                await PerformerService.AddAsync(_performer);
+            else
+                await PerformerService.UpdateAsync(_performer);
+            Nav.NavigateTo("/moviereview/performers");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _saveError = ex.Message;
+        }
+    }
+}

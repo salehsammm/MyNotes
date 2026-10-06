@@ -1,0 +1,116 @@
+@rendermode InteractiveServer
+@page "/moviereview/notes"
+@using MovieReviews.Data
+@using MovieReviews.Services
+@using Markdig
+@inject NoteService NoteService
+@inject IJSRuntime JS
+
+<div class="page-heading"><div><div class="eyebrow">YOUR LIBRARY / NOTES</div><h1>Notes</h1><p>Thoughts and details worth keeping.</p></div></div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input class="form-control" placeholder="Search notes..." @bind="_search" @bind:event="oninput" />
+    </div>
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Filter by category..." @bind="_category" @bind:event="oninput" />
+    </div>
+    <div class="col-md-2 text-end">
+        <a href="/moviereview/notes/new" class="btn btn-primary">New note</a>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <p><em>Loading...</em></p>
+}
+else if (Filtered().Count == 0)
+{
+    <div class="empty-state"><span>▤</span><h3>No notes found</h3><p>Write a note or adjust your filters.</p><a href="/moviereview/notes/new" class="btn btn-primary">New note</a></div>
+}
+else
+{
+    @foreach (var note in Filtered())
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center"
+                 style="cursor:pointer" @onclick="() => Toggle(note.Id)">
+                <span>
+                    <strong>@note.Title</strong>
+                    @if (!string.IsNullOrWhiteSpace(note.Category))
+                    {
+                        <span class="badge bg-secondary ms-2">@note.Category</span>
+                    }
+                </span>
+                <span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick:stopPropagation="true" @onclick="() => Move(note.Id, true)">↑</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick:stopPropagation="true" @onclick="() => Move(note.Id, false)">↓</button>
+                    <a href="/moviereview/notes/@note.Id" class="btn btn-sm btn-outline-secondary" @onclick:stopPropagation="true">Edit</a>
+                    <button class="btn btn-sm btn-outline-danger" @onclick:stopPropagation="true" @onclick="() => Delete(note.Id, note.Title)">x</button>
+                </span>
+            </div>
+            @if (_expanded.Contains(note.Id))
+            {
+                <div class="card-body markdown-body">
+                    @((MarkupString)RenderMarkdown(note.Body))
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Note> _notes = new();
+    private bool _loading = true;
+    private string _search = "";
+    private string _category = "";
+    private HashSet<int> _expanded = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        _notes = await NoteService.GetAllAsync();
+        _loading = false;
+    }
+
+    private List<Note> Filtered()
+    {
+        var q = _search.Trim();
+        var c = _category.Trim();
+
+        return _notes.Where(n =>
+            (string.IsNullOrWhiteSpace(q)
+                || n.Title.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || n.Body.Contains(q, StringComparison.OrdinalIgnoreCase))
+            &&
+            (string.IsNullOrWhiteSpace(c)
+                || (n.Category?.Contains(c, StringComparison.OrdinalIgnoreCase) ?? false))
+        ).ToList();
+    }
+
+    private void Toggle(int id)
+    {
+        if (!_expanded.Remove(id)) _expanded.Add(id);
+    }
+
+    private async Task Move(int id, bool up)
+    {
+        await NoteService.MoveAsync(id, up);
+        await Reload();
+    }
+
+    private async Task Delete(int id, string title)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete note \"{title}\"?"))
+            return;
+        await NoteService.DeleteAsync(id);
+        await Reload();
+    }
+
+    private static string RenderMarkdown(string body)
+    {
+        return Markdown.ToHtml(body ?? "");
+    }
+}

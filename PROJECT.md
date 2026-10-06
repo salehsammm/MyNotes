@@ -1,41 +1,44 @@
-# Frame Notes project guide
+# MyNotes combined application
 
-Frame Notes is a personal movie and TV series journal built with .NET 9 Blazor Server, Entity Framework Core 9, and SQL Server. The starting project was named `MyNotes`; its assembly and solution keep that name.
+MyNotes is the single .NET 9 host for three personal modules. Run `dotnet run` from this project; there is one ASP.NET Core process and one local address.
 
-## Run it
+| Module | Entry route | Development guide | Database |
+| --- | --- | --- | --- |
+| MyNotes movie/TV journal | `/` | [MyNotes.md](Docs/MyNotes.md) | MyNotesMediaJournal |
+| MovieReview collection | `/moviereview` | [MovieReview.md](Docs/MovieReview.md) | MovieReviews |
+| BookmarkCounter | `/bookmarks` | [BookmarkCounter.md](Docs/BookmarkCounter.md) | BookmarkTracker |
 
-1. Start the local SQL Server instance `.\MSSQLSERVER2` and ensure your Windows account can create a database there.
-2. Run `dotnet run` from this directory.
-3. Open the local URL printed in the terminal.
+## Architecture
 
-The connection string is in `appsettings.json`. It uses Windows authentication and database `MyNotesMediaJournal`. Before choosing it, the existing SQL Server databases were checked; `MovieReviews` already exists and is intentionally untouched. For another computer, change `ConnectionStrings:MediaJournal` in local configuration or an environment variable rather than changing code.
+`Program.cs` registers all three modules and applies their EF migrations before starting the web host. They retain separate DbContexts, migration histories, namespaces, and databases. Their existing records are used directly. The original application folders remain as references; ongoing development of the combined app belongs here.
 
-At startup, `Program.cs` calls `Database.MigrateAsync()`. This creates the database if needed and applies pending checked-in EF migrations. The app needs a working SQL Server connection to start. Add a new migration whenever the EF model changes; startup migration applies it on the next run. Do not use `EnsureCreated`, which bypasses migrations.
+- Journal: `Data/`, `Migrations/`, `Components/Pages/Home.razor`.
+- MovieReview: `Modules/MovieReview/` and `wwwroot/moviereview/`.
+- BookmarkCounter: `Modules/BookmarkCounter/` and `wwwroot/bookmarks/`.
+- Shared module links: `Components/ModuleNavigation.razor` (bookmark static pages contain equivalent links).
 
-## Data model
+All packages and compiled Razor components belong to `MyNotes.csproj`. Root `Components/App.razor` owns the HTML document, Blazor script and combined scoped CSS bundle. Each Blazor layout loads its own global styles. Module links perform full navigation to keep the existing styles separate. The existing module screens are retained; the common UI/UX is pending a later design discussion.
 
-- `MediaItem` represents either a movie or a series. It stores the title, optional release year, optional overall rating out of 10, and freeform Unicode review text.
-- `SavedToImdb` and `SavedToLetterboxd` are independent checkboxes on each title. The library has a **Not on IMDb** filter.
-- `Episode` belongs to a series and stores season/episode numbers, optional title, optional rating, and freeform Unicode notes or review.
-- A null rating means **not rated yet** (`?` in the sample notes). Ratings can have one decimal place and must be between 0 and 10. Seasons start at 1; episode 0 is allowed for a special. Each season/episode pair is unique within a series.
-- Deleting a series deletes its episodes. Changing a series into a movie should be done only after its episodes are removed; the UI should preserve those notes until the user explicitly deletes them.
+## Configuration and background work
 
-On 2026-10-06, the user-provided desktop note file was imported directly into the local database: 40 titles and 180 episodes. The file is not copied into the repository or seeded in migrations. A title beginning with `**` was marked as saved to both IMDb and Letterboxd; other titles remain unchecked even if the note mentions those sites. The earlier unlabelled `Silo` episode list conflicts with a later explicit season 1 list, so it is preserved in the series review while the explicit season lists supply episode rows. `Win or Lose` lists E07 twice with different ratings; the first value is the episode rating and the second is preserved in the series review. Unassigned reminders and trailing `E01`–`E24` placeholders were not interpreted as ratings.
+`appsettings.json` holds separate `MediaJournal`, `MovieReview`, and `BookmarkCounter` connection strings, plus the existing `Bookmarks` settings. SQL Server must be reachable and the running Windows account must have access to all three databases and the Edge profile file.
 
-## Code map
+`Bookmarks:EnableBackgroundTasks` defaults to true. It controls bookmark count logging and checklist backfill. These run for the lifetime of MyNotes, even when the browser is closed. Avoid running the old BookmarkCounter host at the same time, which would duplicate scheduled work. Windows Service hosting is supported, but the merge does not install a service or configure automatic startup.
 
-- `Data/MediaItem.cs`, `Data/Episode.cs`: domain records and input validation.
-- `Data/MediaDbContext.cs`: EF relationships, indexes, SQL constraints.
-- `Migrations/`: versioned schema changes.
-- `Components/Pages/Home.razor`: journal UI and save/delete actions.
-- `wwwroot/app.css`: visual styling.
-- `Program.cs`: service registration and automatic migration.
+## Development
 
-## Development workflow
+Build with `dotnet build`, then start and verify the affected module. Update its guide when changing behavior, and this guide when changing shared architecture. Check route prefixes, static asset URLs, and navigation after copying or adding pages. Do not share or rename module entities just because their names overlap.
 
-1. Edit the entity classes and/or `MediaDbContext`.
-2. Create a migration with `dotnet ef migrations add DescriptiveName` (install the matching EF Core 9 CLI tool if needed).
-3. Review the generated migration, then run `dotnet build` and `dotnet run`.
-4. Check that existing reviews remain intact after migrations. Do not edit an already applied migration; create a new one.
+For migrations, always specify the context and output directory:
 
-Use parameterized EF queries, keep all review content as Unicode, and never put personal review data into migration seed code. This is a single-user local app; it does not yet have account authentication or bulk import.
+```powershell
+dotnet ef migrations add ChangeName --context MyNotes.Data.MediaDbContext --output-dir Migrations
+dotnet ef migrations add ChangeName --context MovieReviews.Data.AppDbContext --output-dir Modules/MovieReview/Migrations
+dotnet ef migrations add ChangeName --context BookmarkCounter.Data.AppDbContext --output-dir Modules/BookmarkCounter/Migrations
+```
+
+Install the matching EF 9 CLI tool if needed. Review migrations before starting the app, because startup applies pending migrations to all three databases. Keep personal data out of migration seed code. No account authentication is implemented; this remains a personal local application.
+
+## Merge verification
+
+The combined project built with zero warnings/errors. All three migration histories were recognized as up to date. The journal retained 40 titles/180 episodes; MovieReview retained 7 scenes, 352 performers, and 8 notes. Main module routes, MovieReview lists and new-entry editors, and BookmarkCounter API reads returned successfully. A disposable MovieReview note was saved through the browser and a disposable BookmarkCounter question was created/read/updated through its API; both were removed afterward. Browser checks confirmed module switching, the live bookmark count/history chart, and the journal's IMDb filter. Bookmark logging at startup was observed.
