@@ -8,6 +8,14 @@ All original pages use the `/moviereview` prefix: overview, scenes, scene detail
 
 Scene reviews support drafts, pinned drafts, saved playback position, performer associations and overrides, ratings, tags, locations and positions. Performer features include archive/watchlist flags and attribute details. Notes render Markdown with Markdig. Trophy text import remains available through `dotnet run -- --import-trophies <file>` in the MyNotes project.
 
+## Review import from Re.txt
+
+On October 6, 2026, reviews from `F:\Tala\1\z1\Re.txt` were imported directly into the existing `MovieReviews` database. The database had 7 scenes beforehand; 184 were added, leaving 191 scenes. Two reviews whose titles already existed were skipped. The blank example templates at the start of the file and the trailing numbered site list were not treated as reviews. The source file was not changed.
+
+The import mapped overall, setup, and sex ratings and modifiers to their scene fields. Review text was kept in the corresponding verdict or notes fields, and recognizable positions, locations, and POV flags were recorded. Named performers were linked to existing performer records with their review-specific descriptions in `ScenePerformer.Notes`. Descriptions without a reliable performer name were kept in the scene's sex notes instead of being assigned to someone by guesswork.
+
+Reviews needing placeholder titles use `noname1` through `noname10` in source order. The second review labeled `Dolly Rud - Stepsis got stood up on her date - Family` has different performers from the first and was saved as `noname1` at the user's direction; the other placeholders cover untitled reviews. Do not treat these placeholders as duplicate reviews or replace them automatically; rename one only after its real title is known. For future untitled reviews, use the next unused `noname` number and check existing scene titles before inserting. `All It Took Was A Dare` had performer details but no setup or sex review, so it was saved as a draft with those performer links.
+
 ## Code map
 
 - `Modules/MovieReview/MovieReviewModule.cs`: service registrations and context factory.
