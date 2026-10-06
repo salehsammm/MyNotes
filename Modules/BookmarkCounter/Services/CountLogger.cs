@@ -18,10 +18,17 @@ public class CountLogger : BackgroundService
 
 	protected override async Task ExecuteAsync(CancellationToken ct)
 	{
-		await LogSafeAsync();
-		using var timer = new PeriodicTimer(TimeSpan.FromHours(1));
-		while (await timer.WaitForNextTickAsync(ct))
+		try
+		{
 			await LogSafeAsync();
+			using var timer = new PeriodicTimer(TimeSpan.FromHours(1));
+			while (await timer.WaitForNextTickAsync(ct))
+				await LogSafeAsync();
+		}
+		catch (OperationCanceledException) when (ct.IsCancellationRequested)
+		{
+			// The host is stopping; cancellation of the timer is expected.
+		}
 	}
 
 	private async Task LogSafeAsync()

@@ -1,6 +1,6 @@
 # Frame Notes project guide
 
-Frame Notes is the movie/TV journal module in the combined MyNotes host, built with .NET 9 Blazor Server, Entity Framework Core 9, and SQL Server. It remains at `/`. See the root `PROJECT.md` for shared hosting and the other modules.
+Frame Notes is the movie/TV journal module in the combined MyNotes host, built with .NET 9 Blazor Server, Entity Framework Core 9, and SQL Server. It lives at `/journal`. See the root `PROJECT.md` for shared hosting and the other modules.
 
 ## Run it
 
@@ -39,3 +39,5 @@ On 2026-10-06, the user-provided desktop note file was imported directly into th
 4. Check that existing reviews remain intact after migrations. Do not edit an already applied migration; create a new one.
 
 Use parameterized EF queries, keep all review content as Unicode, and never put personal review data into migration seed code. This is a single-user local app; it does not yet have account authentication or bulk import.
+
+The word **PERSONAL** in the journal header is a discreet link to `/private`. It performs a full navigation to the password screen (or the private area when the current session is already unlocked). Keep it styled like the surrounding caption, with a visible keyboard focus outline.

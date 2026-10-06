@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+const getElement = id => document.getElementById(id);
 const svgNS = 'http://www.w3.org/2000/svg';
 let selectedDays = 30;
 let toastTimer;
@@ -6,7 +6,7 @@ let currentData = [];
 let loadSequence = 0;
 
 function notify(message, error = false) {
-  const toast = $('toast');
+  const toast = getElement('toast');
   toast.textContent = message;
   toast.className = `toast show${error ? ' error' : ''}`;
   clearTimeout(toastTimer);
@@ -21,7 +21,7 @@ function svg(tag, attributes = {}, text = null) {
 }
 
 function renderChart(data) {
-  const chart = $('historyChart');
+  const chart = getElement('historyChart');
   chart.replaceChildren();
   const width = Math.max(280, chart.clientWidth), height = Math.max(240, chart.clientHeight);
   chart.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -63,7 +63,7 @@ function renderChart(data) {
 
 async function loadHistory() {
   const sequence = ++loadSequence;
-  const message = $('chartMessage');
+  const message = getElement('chartMessage');
   message.hidden = false;
   message.textContent = 'Loading history…';
   try {
@@ -73,24 +73,24 @@ async function loadHistory() {
     if (sequence !== loadSequence) return;
     if (!data.length) {
       currentData = [];
-      $('historyChart').replaceChildren();
-      $('currentValue').textContent = '—';
-      $('changeValue').textContent = 'No history in this range yet';
-      $('changeValue').className = 'history-change';
+      getElement('historyChart').replaceChildren();
+      getElement('currentValue').textContent = '—';
+      getElement('changeValue').textContent = 'No history in this range yet';
+      getElement('changeValue').className = 'history-change';
       message.textContent = 'No counts recorded yet. Use “Log count now” to start.';
       return;
     }
     const first = data[0].count, last = data[data.length - 1].count, difference = last - first;
-    $('currentValue').textContent = last.toLocaleString();
-    $('changeValue').textContent = difference === 0 ? 'No change in this range' : `${difference > 0 ? '+' : '−'}${Math.abs(difference)} bookmarks in this range`;
-    $('changeValue').className = `history-change${difference < 0 ? ' good' : difference > 0 ? ' bad' : ''}`;
+    getElement('currentValue').textContent = last.toLocaleString();
+    getElement('changeValue').textContent = difference === 0 ? 'No change in this range' : `${difference > 0 ? '+' : '−'}${Math.abs(difference)} bookmarks in this range`;
+    getElement('changeValue').className = `history-change${difference < 0 ? ' good' : difference > 0 ? ' bad' : ''}`;
     currentData = data;
     renderChart(data);
     message.hidden = true;
   } catch {
     if (sequence !== loadSequence) return;
     currentData = [];
-    $('historyChart').replaceChildren();
+    getElement('historyChart').replaceChildren();
     message.textContent = 'Could not load history. Please try again.';
     notify('Could not load bookmark history.', true);
   }
@@ -106,8 +106,8 @@ document.querySelectorAll('[data-days]').forEach(button => button.addEventListen
   loadHistory();
 }));
 
-$('logButton').addEventListener('click', async () => {
-  const button = $('logButton');
+getElement('logButton').addEventListener('click', async () => {
+  const button = getElement('logButton');
   button.disabled = true;
   try {
     const response = await fetch('/bookmarks/api/log', { method: 'POST' });
@@ -122,4 +122,4 @@ $('logButton').addEventListener('click', async () => {
 });
 
 loadHistory();
-new ResizeObserver(() => { if (currentData.length) renderChart(currentData); }).observe($('historyChart'));
+new ResizeObserver(() => { if (currentData.length) renderChart(currentData); }).observe(getElement('historyChart'));

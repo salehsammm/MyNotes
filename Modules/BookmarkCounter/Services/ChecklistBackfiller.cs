@@ -12,10 +12,17 @@ public class ChecklistBackfiller : BackgroundService
 
 	protected override async Task ExecuteAsync(CancellationToken ct)
 	{
-		await SafeRun();
-		using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
-		while (await timer.WaitForNextTickAsync(ct))
+		try
+		{
 			await SafeRun();
+			using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
+			while (await timer.WaitForNextTickAsync(ct))
+				await SafeRun();
+		}
+		catch (OperationCanceledException) when (ct.IsCancellationRequested)
+		{
+			// The host is stopping; cancellation of the timer is expected.
+		}
 	}
 
 	private async Task SafeRun()

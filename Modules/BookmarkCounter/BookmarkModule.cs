@@ -31,6 +31,8 @@ public static class BookmarkModule
     {
         var folderName = app.Configuration["Bookmarks:Folder"] ?? "YT_Prio";
         var group = app.MapGroup("/bookmarks");
+        app.MapGet("/", (IWebHostEnvironment env) =>
+            Results.File(Path.Combine(env.WebRootPath, "bookmarks", "index.html"), "text/html; charset=utf-8"));
         group.MapGet("/", (IWebHostEnvironment env) =>
             Results.File(Path.Combine(env.WebRootPath, "bookmarks", "index.html"), "text/html; charset=utf-8"));
         group.MapGet("/history", (IWebHostEnvironment env) =>

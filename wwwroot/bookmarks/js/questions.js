@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+const getElement = id => document.getElementById(id);
 let toastTimer;
 
 async function request(url, options) {
@@ -9,7 +9,7 @@ async function request(url, options) {
 }
 
 function notify(message, error = false) {
-  const toast = $('toast');
+  const toast = getElement('toast');
   toast.textContent = message;
   toast.className = `toast show${error ? ' error' : ''}`;
   clearTimeout(toastTimer);
@@ -32,13 +32,13 @@ async function loadQuestions() {
     const questions = await request('/bookmarks/api/questions');
     const open = questions.filter(q => !q.isAnswered);
     const answered = questions.filter(q => q.isAnswered);
-    $('openCount').textContent = `${open.length} open`;
-    $('answeredCount').textContent = `${answered.length} answered`;
-    $('openQuestions').replaceChildren(...(open.length ? open.map(renderQuestion) : [emptyState('No open questions', 'Add something you are curious about.') ]));
-    $('answeredQuestions').replaceChildren(...(answered.length ? answered.map(renderQuestion) : [emptyState('Nothing answered yet', 'Your discoveries will appear here.') ]));
+    getElement('openCount').textContent = `${open.length} open`;
+    getElement('answeredCount').textContent = `${answered.length} answered`;
+    getElement('openQuestions').replaceChildren(...(open.length ? open.map(renderQuestion) : [emptyState('No open questions', 'Add something you are curious about.') ]));
+    getElement('answeredQuestions').replaceChildren(...(answered.length ? answered.map(renderQuestion) : [emptyState('Nothing answered yet', 'Your discoveries will appear here.') ]));
   } catch {
-    $('openQuestions').replaceChildren(emptyState('Could not load questions', 'Try refreshing the page.'));
-    $('answeredQuestions').replaceChildren();
+    getElement('openQuestions').replaceChildren(emptyState('Could not load questions', 'Try refreshing the page.'));
+    getElement('answeredQuestions').replaceChildren();
     notify('Could not load questions.', true);
   }
 }
@@ -115,7 +115,7 @@ function editQuestion(question, card) {
   form.elements.text.focus();
 }
 
-$('newQuestionForm').addEventListener('submit', async event => {
+getElement('newQuestionForm').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.currentTarget;
   const text = form.elements.text.value.trim();
@@ -125,12 +125,12 @@ $('newQuestionForm').addEventListener('submit', async event => {
   try {
     await request('/bookmarks/api/questions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, answer: null, isAnswered: false }) });
     form.reset();
-    $('newQuestionError').hidden = true;
+    getElement('newQuestionError').hidden = true;
     await loadQuestions();
     notify('Question added.');
   } catch {
-    $('newQuestionError').textContent = 'Could not add this question.';
-    $('newQuestionError').hidden = false;
+    getElement('newQuestionError').textContent = 'Could not add this question.';
+    getElement('newQuestionError').hidden = false;
   } finally { submit.disabled = false; }
 });
 

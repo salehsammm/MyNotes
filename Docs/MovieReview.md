@@ -27,3 +27,9 @@ Use `/moviereview/...` for links and `NavigationManager.NavigateTo` targets. Eve
 Ctrl+S and Esc handlers are registered by editors and disposed on departure; the script is loaded by the host App component. Module styles are loaded by the module layout. Do not add a second Blazor App component, router, or host Program.cs.
 
 Schema changes use `--context MovieReviews.Data.AppDbContext --output-dir Modules/MovieReview/Migrations`. Connection configuration is `ConnectionStrings:MovieReview`. Update this guide when features or schema change. Verify CRUD on the affected page and that the preserved migration history is used; never recreate the existing database.
+
+## Password protection
+
+Enter through `/private`, which is not shown in public navigation. All pages import the `PrivateArea` authorization attribute. The host gates direct private URLs and assets, and overrides the module DbContext factory with `PrivateMovieDbContextFactory` to check session access before each database operation. Preserve these controls for new pages and services; a hidden link by itself does not enforce privacy.
+
+The module layout includes an antiforgery-protected **Lock private area** form and loads its keyboard shortcut script only inside the private module. The global public App component must not load this script. See root PROJECT.md for password hash storage, session expiry and server maintenance access.

@@ -3,8 +3,13 @@
 <HeadContent>
     <link rel="stylesheet" href="/moviereview/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/moviereview/app.css" />
+    <script src="/moviereview/js/ctrl-s.js"></script>
 </HeadContent>
 <MyNotes.Components.ModuleNavigation />
+<form action="/private/lock" method="post" class="private-lock">
+    <AntiforgeryToken />
+    <button type="submit">Lock private area</button>
+</form>
 
 <div class="app-shell">
     <aside class="sidebar"><NavMenu /></aside>

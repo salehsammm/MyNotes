@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+const getElement = id => document.getElementById(id);
 const selectedDate = new Date();
 selectedDate.setHours(0, 0, 0, 0);
 let loadSequence = 0;
@@ -15,7 +15,7 @@ function dateKey(date) {
 }
 
 function notify(message, error = false) {
-  const toast = $('toast');
+  const toast = getElement('toast');
   toast.textContent = message;
   toast.className = `toast show${error ? ' error' : ''}`;
   clearTimeout(toastTimer);
@@ -32,23 +32,23 @@ async function request(url, options) {
 async function refreshCount() {
   try {
     const data = await request('/bookmarks/api/count');
-    $('bookmarkCount').textContent = Number(data.count).toLocaleString();
-    $('folderName').textContent = data.folder || 'Bookmark folder';
+    getElement('bookmarkCount').textContent = Number(data.count).toLocaleString();
+    getElement('folderName').textContent = data.folder || 'Bookmark folder';
     const date = new Date(data.at);
-    $('countStatus').textContent = `Updated ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-    $('countStatus').classList.remove('error');
+    getElement('countStatus').textContent = `Updated ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    getElement('countStatus').classList.remove('error');
   } catch {
-    $('countStatus').textContent = 'Unable to refresh';
-    $('countStatus').classList.add('error');
+    getElement('countStatus').textContent = 'Unable to refresh';
+    getElement('countStatus').classList.add('error');
   }
 }
 
 function updateDateNavigation() {
   const isToday = dateKey(selectedDate) === dateKey(today());
-  $('dateLabel').textContent = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  $('jumpDate').value = dateKey(selectedDate);
-  $('todayButton').hidden = isToday;
-  $('viewingHint').textContent = isToday ? 'Viewing today' : dateKey(selectedDate) < dateKey(today()) ? 'Viewing an earlier day' : 'Viewing a future day';
+  getElement('dateLabel').textContent = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  getElement('jumpDate').value = dateKey(selectedDate);
+  getElement('todayButton').hidden = isToday;
+  getElement('viewingHint').textContent = isToday ? 'Viewing today' : dateKey(selectedDate) < dateKey(today()) ? 'Viewing an earlier day' : 'Viewing a future day';
   updateResets();
 }
 
@@ -64,8 +64,8 @@ function countdown(target) {
 
 function updateResets() {
   if (dateKey(selectedDate) !== dateKey(today())) {
-    $('dailyReset').textContent = 'Progress for this day';
-    $('weeklyReset').textContent = 'Progress for this week';
+    getElement('dailyReset').textContent = 'Progress for this day';
+    getElement('weeklyReset').textContent = 'Progress for this week';
     return;
   }
   const midnight = new Date();
@@ -74,8 +74,8 @@ function updateResets() {
   let days = (6 - saturday.getDay() + 7) % 7;
   if (!days) days = 7;
   saturday.setDate(saturday.getDate() + days);
-  $('dailyReset').textContent = `Resets in ${countdown(midnight)}`;
-  $('weeklyReset').textContent = `Resets in ${countdown(saturday)}`;
+  getElement('dailyReset').textContent = `Resets in ${countdown(midnight)}`;
+  getElement('weeklyReset').textContent = `Resets in ${countdown(saturday)}`;
 }
 
 async function loadChecklist() {
@@ -90,7 +90,7 @@ async function loadChecklist() {
   } catch {
     if (sequence !== loadSequence) return;
     for (const kind of ['daily', 'weekly']) {
-      const list = $(`${kind}Items`);
+      const list = getElement(`${kind}Items`);
       list.replaceChildren(emptyState('Could not load items', 'Try refreshing the page.'));
     }
     notify('Could not load the checklist.', true);
@@ -98,10 +98,10 @@ async function loadChecklist() {
 }
 
 async function loadMissed() {
-  const list = $('missedItems');
+  const list = getElement('missedItems');
   try {
     const items = await request('/bookmarks/api/checklist/missed');
-    $('missedSummary').textContent = `${items.length} open`;
+    getElement('missedSummary').textContent = `${items.length} open`;
     list.replaceChildren();
     if (!items.length) {
       list.append(emptyState('All caught up', 'No unfinished tasks from past periods.'));
@@ -114,12 +114,12 @@ async function loadMissed() {
 }
 
 async function loadQuestionPreview() {
-  const list = $('questionPreviewList');
+  const list = getElement('questionPreviewList');
   try {
     const questions = await request('/bookmarks/api/questions');
     const open = questions.filter(q => !q.isAnswered);
     const answered = questions.filter(q => q.isAnswered);
-    $('questionCounts').textContent = `${open.length} unanswered · ${answered.length} answered`;
+    getElement('questionCounts').textContent = `${open.length} unanswered · ${answered.length} answered`;
     list.replaceChildren();
     if (!questions.length) {
       list.append(emptyState('No questions yet', 'Keep a curiosity here whenever it comes to mind.'));
@@ -138,7 +138,7 @@ async function loadQuestionPreview() {
       list.append(link);
     }
   } catch {
-    $('questionCounts').textContent = 'Questions unavailable';
+    getElement('questionCounts').textContent = 'Questions unavailable';
     list.replaceChildren();
   }
 }
@@ -155,12 +155,12 @@ function emptyState(title, detail) {
 }
 
 function renderList(kind, items) {
-  const list = $(`${kind}Items`);
+  const list = getElement(`${kind}Items`);
   list.replaceChildren();
   const required = items.filter(item => !item.isOptional);
   const completed = required.filter(item => item.completed).length;
-  $(`${kind}Summary`).textContent = required.length ? `${completed} of ${required.length} done` : 'No required tasks';
-  $(`${kind}Progress`).style.width = `${required.length ? completed / required.length * 100 : 0}%`;
+  getElement(`${kind}Summary`).textContent = required.length ? `${completed} of ${required.length} done` : 'No required tasks';
+  getElement(`${kind}Progress`).style.width = `${required.length ? completed / required.length * 100 : 0}%`;
   if (!items.length) {
     list.append(emptyState('A fresh start', 'Add an item to begin tracking.'));
     return;
@@ -277,7 +277,7 @@ function showForm(recurrence, item = null, row = null) {
     row.classList.add('hidden-for-edit');
     row.after(form);
   } else {
-    $(`${kind}Items`).after(form);
+    getElement(`${kind}Items`).after(form);
   }
   title.focus();
 }
@@ -300,10 +300,10 @@ document.addEventListener('click', event => {
   }
 });
 document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => showForm(button.dataset.add)));
-$('previousDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() - 1); loadChecklist(); });
-$('nextDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() + 1); loadChecklist(); });
-$('jumpDate').addEventListener('change', event => { if (event.target.value) { selectedDate.setTime(new Date(`${event.target.value}T00:00:00`).getTime()); loadChecklist(); } });
-$('todayButton').addEventListener('click', () => { selectedDate.setTime(today().getTime()); loadChecklist(); });
+getElement('previousDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() - 1); loadChecklist(); });
+getElement('nextDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() + 1); loadChecklist(); });
+getElement('jumpDate').addEventListener('change', event => { if (event.target.value) { selectedDate.setTime(new Date(`${event.target.value}T00:00:00`).getTime()); loadChecklist(); } });
+getElement('todayButton').addEventListener('click', () => { selectedDate.setTime(today().getTime()); loadChecklist(); });
 refreshCount();
 loadChecklist();
 loadQuestionPreview();
