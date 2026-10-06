@@ -5,6 +5,18 @@ public class Scene
 	public int Id { get; set; }
 	public string Title { get; set; } = "";
 	public string? Studio { get; set; }
+	public string? Url { get; set; }
+	public string? AlternateUrls { get; set; }
+	public string? CoverUrl { get; set; }
+	public string? RaindropId { get; set; }
+	public string? SourceTitle { get; set; }
+	public string? SourceNote { get; set; }
+	public string? SourceExcerpt { get; set; }
+	public string? SourceHighlights { get; set; }
+	public string? SourceArchive { get; set; }
+	public DateTime? SourceCreated { get; set; }
+	public bool? SourceFavorite { get; set; }
+	public string? SourceData { get; set; }
 	public bool IsDraft { get; set; }
 	public bool IsPinnedDraft { get; set; }
 	public int? ResumeAtSeconds { get; set; }

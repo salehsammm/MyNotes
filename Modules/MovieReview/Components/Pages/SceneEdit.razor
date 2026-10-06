@@ -58,6 +58,11 @@ else
             </div>
         </div>
 
+        <div class="mb-2">
+            <label>Review URL</label>
+            <InputText @bind-Value="_scene.Url" class="form-control" type="url" placeholder="https://..." />
+        </div>
+
         <hr />
 
         <h4 class="d-flex align-items-center" style="cursor: pointer;" @onclick="() => _showOverall = !_showOverall">

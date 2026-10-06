@@ -80,6 +80,7 @@ public class SceneService
 
 		existing.Title = s.Title;
 		existing.Studio = s.Studio;
+		existing.Url = s.Url;
 		existing.IsDraft = s.IsDraft;
 		existing.IsPinnedDraft = s.IsDraft && existing.IsPinnedDraft;
 		existing.ResumeAtSeconds = s.ResumeAtSeconds;

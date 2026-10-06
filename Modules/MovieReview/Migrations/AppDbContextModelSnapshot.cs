@@ -347,8 +347,14 @@ namespace MovieReviews.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AlternateUrls")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CoverUrl")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDraft")
                         .HasColumnType("bit");
@@ -374,6 +380,33 @@ namespace MovieReviews.Migrations
 
                     b.Property<string>("Positions")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RaindropId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceArchive")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceData")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SourceCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceExcerpt")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("SourceFavorite")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SourceHighlights")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceTitle")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("ResumeAtSeconds")
@@ -408,6 +441,9 @@ namespace MovieReviews.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Url")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Verdict")

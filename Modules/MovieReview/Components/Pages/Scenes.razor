@@ -233,7 +233,7 @@ else
         var q = _search.Trim();
         return _scenes.Where(s =>
             (_statusFilter == "" || (_statusFilter == "draft") == s.IsDraft) &&
-            (string.IsNullOrWhiteSpace(q) || Contains(s.Title, q) || Contains(s.Studio, q) || s.Performers.Any(sp => Contains(sp.Performer.Name, q))) &&
+            (string.IsNullOrWhiteSpace(q) || Contains(s.Title, q) || Contains(s.Studio, q) || Contains(s.Url, q) || Contains(s.SourceTitle, q) || s.Performers.Any(sp => Contains(sp.Performer.Name, q))) &&
             (!_minRating.HasValue || s.OverallRating >= _minRating.Value) &&
             (!_maxRating.HasValue || s.OverallRating <= _maxRating.Value) &&
             (_pov == "" || s.IsPov == (_pov == "yes")) &&
@@ -381,6 +381,7 @@ else
             draft.Append("Name: ").Append(scene.Title).Append('\n');
             if (scene.ResumeAtSeconds is int resume) draft.Append("Continue at: ").Append(PlaybackPosition.Format(resume)).Append('\n');
             if (!string.IsNullOrWhiteSpace(scene.Studio)) draft.Append("Studio: ").Append(scene.Studio).Append('\n');
+            if (!string.IsNullOrWhiteSpace(scene.Url)) draft.Append("URL: ").Append(scene.Url).Append('\n');
             if (scene.Performers.Count > 0)
                 draft.Append("Performers: ").Append(string.Join(", ", scene.Performers.Select(sp => allPerformers.FirstOrDefault(p => p.Id == sp.PerformerId)?.Name).Where(n => n is not null))).Append('\n');
             if (scene.OverallRating.HasValue) draft.Append("Overall: ").Append(RatingLabel(scene.OverallRating, scene.OverallModifier)).Append('\n');
@@ -408,6 +409,7 @@ else
         var sb = new StringBuilder();
 
         sb.Append("Name: ").Append(scene.Title).Append('\n');
+        if (!string.IsNullOrWhiteSpace(scene.Url)) sb.Append("URL: ").Append(scene.Url).Append('\n');
 
         var rating = RatingLabel(scene.OverallRating, scene.OverallModifier);
         var povPart = scene.IsPov ? "POV -- " : "";
