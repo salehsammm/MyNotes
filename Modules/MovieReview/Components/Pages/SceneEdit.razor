@@ -16,6 +16,14 @@
 
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / SCENES</div><h1>@(Id == 0 ? "New scene review" : "Edit scene review")</h1><p>Save a draft at any point, then return when you are ready to finish.</p></div></div>
 
+@if (!string.IsNullOrWhiteSpace(_saveError))
+{
+    <div class="scene-save-snackbar" role="alert" aria-atomic="true">
+        <span>@_saveError</span>
+        <button type="button" class="btn-close btn-close-white" aria-label="Dismiss save error" @onclick="() => _saveError = null"></button>
+    </div>
+}
+
 @if (_loading)
 {
     <p><em>Loading...</em></p>
@@ -37,11 +45,11 @@ else
         }
         @if (!string.IsNullOrWhiteSpace(_saveError))
         {
-            <div class="alert alert-danger" role="alert">@_saveError</div>
+            <div class="alert alert-danger">@_saveError</div>
         }
         <div class="mb-2">
-            <label>Title <span class="text-danger">*</span></label>
-            <InputText @bind-Value="_scene.Title" class="form-control" />
+            <label for="sceneTitle">Title <span class="text-danger">*</span></label>
+            <input id="sceneTitle" @ref="_titleInput" @bind="_scene.Title" @bind:event="oninput" class="form-control" autofocus="@(Id == 0)" />
         </div>
 
         <div class="mb-2">
@@ -331,7 +339,7 @@ else
 @if (_editingPerformer is not null)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
@@ -497,6 +505,8 @@ else
     private bool _loading = true;
     private bool _saving;
     private string? _saveError;
+    private ElementReference _titleInput;
+    private bool _focusTitlePending;
     private string _resumeTimeText = "";
 
     private List<Performer> _allPerformers = new();
@@ -552,6 +562,8 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        _focusTitlePending = Id == 0;
+        _saveError = null;
 
         _allPerformers = await PerformerService.GetAllAsync(includeArchived: true);
         _studios = await StudioService.GetAllAsync();
@@ -584,6 +596,11 @@ else
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("ctrlS.register", "sceneEdit", _objRef, nameof(TriggerSave), nameof(TriggerEsc));
             _jsRegistered = true;
+        }
+        if (_focusTitlePending && !_loading && _scene is not null)
+        {
+            _focusTitlePending = false;
+            await _titleInput.FocusAsync();
         }
     }
 

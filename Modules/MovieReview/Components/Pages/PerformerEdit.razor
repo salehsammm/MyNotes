@@ -22,7 +22,7 @@ else if (_performer is null)
 }
 else
 {
-    <EditForm Model="_performer" OnValidSubmit="Save" FormName="performerForm">
+    <EditForm Model="_performer" OnValidSubmit="Save" FormName="performerForm" class="performer-editor">
         @if (_performer.IsArchived)
         {
             <div class="alert alert-warning">This performer is archived. Restore them from the Archived tab to add them to new scenes.</div>
@@ -156,8 +156,10 @@ else
             <label class="form-check-label">Watchlist</label>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a href="/moviereview/performers" class="btn btn-secondary ms-2">Back</a>
+        <div class="performer-editor-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="/moviereview/performers" class="btn btn-secondary">Cancel</a>
+        </div>
     </EditForm>
 }
 

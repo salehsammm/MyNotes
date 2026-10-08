@@ -8,7 +8,7 @@ namespace MyNotes.Security;
 public sealed class PrivateAccessStore(IConfiguration configuration)
 {
     public const string SessionClaim = "private-session";
-    public static readonly TimeSpan SessionLifetime = TimeSpan.FromMinutes(30);
+    public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(6);
     private readonly ConcurrentDictionary<string, DateTimeOffset> sessions = new();
     private readonly string passwordFile = configuration["PrivateAccess:PasswordFile"]
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyNotes", "private-access.json");
