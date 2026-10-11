@@ -7,7 +7,7 @@
 
 <PageTitle>Studios · MovieReviews</PageTitle>
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / STUDIOS</div><h1>Studios</h1><p>Explore reviews by studio.</p></div></div>
-@if (_loading) { <p>Loading studios...</p> }
+@if (_loading) { <p data-app-busy="Loading studios..." role="status">Loading studios...</p> }
 else if (_studios.Count == 0) { <div class="empty-state"><span>◈</span><h3>No studios yet</h3><p>Define one while editing a scene to see it here.</p></div> }
 else { <div class="collection-grid">@foreach (var studio in _studios) { <a href="/moviereview/studios/@Uri.EscapeDataString(studio.Name)" class="collection-card"><span class="collection-icon">◈</span><strong>@studio.Name</strong><small>@studio.Count scene@(@studio.Count == 1 ? "" : "s")</small><span class="collection-arrow">View scenes →</span></a> }</div> }
 

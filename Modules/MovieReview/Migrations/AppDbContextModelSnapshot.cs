@@ -412,6 +412,9 @@ namespace MovieReviews.Migrations
                     b.Property<int?>("ResumeAtSeconds")
                         .HasColumnType("int");
 
+                    b.Property<bool>("SetupDumb")
+                        .HasColumnType("bit");
+
                     b.Property<int>("SetupModifier")
                         .HasColumnType("int");
 
@@ -422,6 +425,9 @@ namespace MovieReviews.Migrations
                         .HasColumnType("int");
 
                     b.Property<bool>("SetupSpeaksNoEnglish")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("SetupWeird")
                         .HasColumnType("bit");
 
                     b.Property<int>("SexModifier")

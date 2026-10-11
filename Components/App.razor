@@ -6,13 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="stylesheet" href="@Assets["MyNotes.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["busy.css"]" />
     <ImportMap />
     <HeadOutlet />
 </head>
 
 <body>
-    <Routes />
+    <div id="app-workspace"><Routes /></div>
+    <div id="app-busy-overlay" class="app-busy-overlay" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <div class="app-busy-card"><span class="app-busy-spinner" aria-hidden="true"></span><span id="app-busy-message">Loading page…</span></div>
+    </div>
     <script src="_framework/blazor.web.js"></script>
+    <script src="@Assets["busy.js"]"></script>
 </body>
 
 </html>

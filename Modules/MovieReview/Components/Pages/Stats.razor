@@ -6,7 +6,7 @@
 
 <PageTitle>Stats · MovieReviews</PageTitle>
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / INSIGHTS</div><h1>Collection stats</h1><p>A closer look at what you have reviewed.</p></div></div>
-@if (_loading) { <p>Loading stats...</p> }
+@if (_loading) { <p data-app-busy="Loading stats..." role="status">Loading stats...</p> }
 else if (_scenes.Count == 0) { <div class="empty-state"><span>▥</span><h3>Nothing to chart yet</h3><p>Stats will appear after you add a scene.</p><a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a></div> }
 else {
     <div class="insight-grid">

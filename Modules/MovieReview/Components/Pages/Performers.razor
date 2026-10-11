@@ -26,7 +26,7 @@
 
 @if (_loading)
 {
-    <p><em>Loading...</em></p>
+    <p data-app-busy="Loading..." role="status">Loading...</p>
 }
 else if (_totalCount == 0 && string.IsNullOrWhiteSpace(_search))
 {

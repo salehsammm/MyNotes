@@ -31,6 +31,8 @@ public class Scene
 	public int SetupModifier { get; set; }
 	public string? SetupNotes { get; set; }
 	public bool SetupSpeaksNoEnglish { get; set; }
+	public bool SetupWeird { get; set; }
+	public bool SetupDumb { get; set; }
 
 	// sex
 	public Rating? SexRating { get; set; }

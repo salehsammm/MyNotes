@@ -16,7 +16,7 @@ public class PerformerService
 	{
 		if (!includeArchived) return (await GetPageAsync("", "name", true, 1, int.MaxValue)).Items;
 		await using var db = await _factory.CreateDbContextAsync();
-		return await db.Performers.AsNoTracking().Include(p => p.SkinColor).Include(p => p.BoobSize)
+		return await db.Performers.AsNoTracking().AsSplitQuery().Include(p => p.SkinColor).Include(p => p.BoobSize)
 			.Include(p => p.AssSize).Include(p => p.BjTags).OrderBy(p => p.Name).ToListAsync();
 	}
 

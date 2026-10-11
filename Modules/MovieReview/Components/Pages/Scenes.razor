@@ -1,4 +1,4 @@
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @page "/moviereview/scenes"
 @using MovieReviews.Data
 @using MovieReviews.Services
@@ -6,8 +6,11 @@
 @inject SceneService SceneService
 @inject PerformerService PerformerService
 @inject IJSRuntime JS
+@inject ILogger<Scenes> Logger
 
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / SCENES</div><h1>Scenes</h1><p>Browse, search, and organize your reviews.</p></div></div>
+@if (_actionBusy) { <span hidden data-app-busy="Working on your scene…"></span> }
+@if (_actionError is not null) { <div class="alert alert-danger" role="alert">@_actionError</div> }
 
 <div class="row mb-3">
     <div class="col-md-6">
@@ -43,11 +46,12 @@
 
 @if (_loading)
 {
-    <p><em>Loading...</em></p>
+    <p data-app-busy="Loading..." role="status">Loading...</p>
 }
 else if (_scenes.Count == 0)
 {
-    <div class="empty-state"><span>▣</span><h3>No scenes yet</h3><p>Start your collection with your first review.</p><a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a></div>
+    @if (_actionError is not null) { <button type="button" class="btn btn-primary" @onclick="Reload">Try loading again</button> }
+    else { <div class="empty-state"><span>▣</span><h3>No scenes yet</h3><p>Start your collection with your first review.</p><a href="/moviereview/scenes/new" class="btn btn-primary">New scene</a></div> }
 }
 else if (Filtered().Count == 0)
 {
@@ -140,6 +144,8 @@ else
     private List<Performer> _allPerformers = new();
     private Dictionary<int, Performer> _performersById = new();
     private bool _loading = true;
+    private bool _actionBusy;
+    private string? _actionError;
 
     private const int PageSize = 20;
     private int _page = 1;
@@ -174,14 +180,23 @@ else
     private async Task Reload()
     {
         _loading = true;
-        var scenesTask = SceneService.GetAllAsync();
-        var performersTask = PerformerService.GetAllAsync(includeArchived: true);
-        await Task.WhenAll(scenesTask, performersTask);
-        _scenes = await scenesTask;
-        _allPerformers = await performersTask;
-        _performersById = _allPerformers.ToDictionary(p => p.Id);
-        _loading = false;
-        if (_page > TotalPages()) _page = Math.Max(1, TotalPages());
+        _actionError = null;
+        try
+        {
+            var scenesTask = SceneService.GetAllAsync();
+            var performersTask = PerformerService.GetAllAsync(includeArchived: true);
+            await Task.WhenAll(scenesTask, performersTask);
+            _scenes = await scenesTask;
+            _allPerformers = await performersTask;
+            _performersById = _allPerformers.ToDictionary(p => p.Id);
+            if (_page > TotalPages()) _page = Math.Max(1, TotalPages());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load scenes");
+            _actionError = "Could not load your scenes. Try again, or unlock the private area if your session expired.";
+        }
+        finally { _loading = false; }
     }
 
     private void OnSearchChanged(ChangeEventArgs e)
@@ -291,29 +306,42 @@ else
     private void PrevPage() { if (_page > 1) _page--; }
     private void NextPage() { if (_page < TotalPages()) _page++; }
 
-    private async Task ToggleDraftPin(int id)
+    private async Task RunSceneAction(Func<Task> action)
+    {
+        if (_loading || _actionBusy) return;
+        _actionBusy = true;
+        _actionError = null;
+        try { await action(); }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to perform scene action");
+            _actionError = "Could not finish this action. Please try again.";
+        }
+        finally { _actionBusy = false; }
+    }
+
+    private Task ToggleDraftPin(int id) => RunSceneAction(async () =>
     {
         await SceneService.ToggleDraftPinAsync(id);
         await Reload();
-    }
+    });
 
-    private async Task Delete(int id, string title)
+    private Task Delete(int id, string title) => RunSceneAction(async () =>
     {
         if (!await JS.InvokeAsync<bool>("confirm", $"Delete scene \"{title}\"? This cannot be undone."))
             return;
         await SceneService.DeleteAsync(id);
         await Reload();
-    }
+    });
 
-    private async Task OpenExport(int id)
+    private Task OpenExport(int id) => RunSceneAction(async () =>
     {
         var scene = await SceneService.GetAsync(id);
         if (scene is null) return;
-        var performers = await PerformerService.GetAllAsync(includeArchived: true);
-        _exportText = BuildExportText(scene, performers);
+        _exportText = BuildExportText(scene, scene.Performers.Select(sp => sp.Performer).ToList());
         _copied = false;
         _exportOpen = true;
-    }
+    });
 
     private void CloseExport()
     {
@@ -387,16 +415,11 @@ else
             if (scene.OverallRating.HasValue) draft.Append("Overall: ").Append(RatingLabel(scene.OverallRating, scene.OverallModifier)).Append('\n');
             if (scene.SetupRating.HasValue) draft.Append("Setup rating: ").Append(RatingLabel(scene.SetupRating, scene.SetupModifier)).Append('\n');
             if (scene.SexRating.HasValue) draft.Append("Sex rating: ").Append(RatingLabel(scene.SexRating, scene.SexModifier)).Append('\n');
-            if (scene.SetupSpeaksNoEnglish || !string.IsNullOrWhiteSpace(scene.SetupNotes))
+            var setupParts = SetupFlags(scene);
+            if (!string.IsNullOrWhiteSpace(scene.SetupNotes)) setupParts.Add(scene.SetupNotes.Trim());
+            if (setupParts.Count > 0)
             {
-                draft.Append("\nSetup: ");
-                if (scene.SetupSpeaksNoEnglish) draft.Append("speak no english");
-                if (!string.IsNullOrWhiteSpace(scene.SetupNotes))
-                {
-                    if (scene.SetupSpeaksNoEnglish) draft.Append(", ");
-                    draft.Append(scene.SetupNotes.Trim());
-                }
-                draft.Append('\n');
+                draft.Append("\nSetup: ").Append(string.Join(", ", setupParts)).Append('\n');
             }
             if (!string.IsNullOrWhiteSpace(scene.SexNotes)) draft.Append("\nSex: ").Append(scene.SexNotes.Trim()).Append('\n');
             if (!string.IsNullOrWhiteSpace(scene.Verdict)) draft.Append("\nVerdict: ").Append(scene.Verdict.Trim()).Append('\n');
@@ -419,7 +442,7 @@ else
         var setupRating = RatingLabel(scene.SetupRating, scene.SetupModifier);
         var setupNotes = scene.SetupNotes ?? "";
         sb.Append("Setup: ");
-        if (scene.SetupSpeaksNoEnglish) sb.Append("speak no english, ");
+        foreach (var flag in SetupFlags(scene)) sb.Append(flag).Append(", ");
         sb.Append(setupRating).Append(", ").Append(setupNotes).Append(",\n");
 
         sb.Append('\n');
@@ -449,6 +472,15 @@ else
         sb.Append("\n\n\n");
 
         return sb.ToString();
+    }
+
+    private static List<string> SetupFlags(Scene scene)
+    {
+        var flags = new List<string>();
+        if (scene.SetupSpeaksNoEnglish) flags.Add("speak no english");
+        if (scene.SetupWeird) flags.Add("weird");
+        if (scene.SetupDumb) flags.Add("dumb");
+        return flags;
     }
 
     private static string BuildPerformerBlock(Performer p, ScenePerformer sp)

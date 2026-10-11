@@ -1,0 +1,6 @@
+.app-busy-overlay[hidden] { display: none; }
+.app-busy-overlay { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; background: #151a2570; cursor: wait; }
+.app-busy-card { display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 40px); padding: 24px 30px; border-radius: 14px; background: #fff; color: #232833; box-shadow: 0 12px 50px #0003; font: 600 16px/1.5 "Segoe UI", sans-serif; }
+.app-busy-spinner { width: 26px; height: 26px; flex-shrink: 0; border: 3px solid #e7e4df; border-top-color: #b77746; border-radius: 50%; animation: app-busy-spin .8s linear infinite; }
+@keyframes app-busy-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .app-busy-spinner { animation: none; } }

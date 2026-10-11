@@ -1,4 +1,4 @@
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @page "/moviereview/scenes/new"
 @page "/moviereview/scenes/{Id:int}"
 @using MovieReviews.Data
@@ -16,6 +16,11 @@
 
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / SCENES</div><h1>@(Id == 0 ? "New scene review" : "Edit scene review")</h1><p>Save a draft at any point, then return when you are ready to finish.</p></div></div>
 
+@if (IsBusy)
+{
+    <span hidden data-app-busy="@BusyMessage"></span>
+}
+
 @if (!string.IsNullOrWhiteSpace(_saveError))
 {
     <div class="scene-save-snackbar" role="alert" aria-atomic="true">
@@ -26,7 +31,12 @@
 
 @if (_loading)
 {
-    <p><em>Loading...</em></p>
+    <p role="status">Loading scene and editor options…</p>
+}
+else if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+    <button type="button" class="btn btn-primary" @onclick="OnParametersSetAsync">Try loading again</button>
 }
 else if (_scene is null)
 {
@@ -136,10 +146,18 @@ else
                     <label>Modifier (-2 .. +2)</label>
                     <InputNumber @bind-Value="_scene.SetupModifier" class="form-control" />
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-4 d-flex flex-wrap gap-3 align-items-end">
                     <div class="form-check">
-                        <InputCheckbox @bind-Value="_scene.SetupSpeaksNoEnglish" class="form-check-input" />
-                        <label class="form-check-label">Speak no English</label>
+                        <InputCheckbox id="setupSpeaksNoEnglish" @bind-Value="_scene.SetupSpeaksNoEnglish" class="form-check-input" />
+                        <label for="setupSpeaksNoEnglish" class="form-check-label">Speak no English</label>
+                    </div>
+                    <div class="form-check">
+                        <InputCheckbox id="setupWeird" @bind-Value="_scene.SetupWeird" class="form-check-input" />
+                        <label for="setupWeird" class="form-check-label">Weird</label>
+                    </div>
+                    <div class="form-check">
+                        <InputCheckbox id="setupDumb" @bind-Value="_scene.SetupDumb" class="form-check-input" />
+                        <label for="setupDumb" class="form-check-label">Dumb</label>
                     </div>
                 </div>
             </div>
@@ -504,6 +522,10 @@ else
     private Scene? _scene;
     private bool _loading = true;
     private bool _saving;
+    private bool _loadingPerformer;
+    private string? _loadError;
+    private bool IsBusy => _loading || _saving || _savingPerformer || _savingStudio || _loadingPerformer;
+    private string BusyMessage => _loading ? "Loading scene and editor options…" : _loadingPerformer ? "Loading performer…" : "Saving your changes…";
     private string? _saveError;
     private ElementReference _titleInput;
     private bool _focusTitlePending;
@@ -564,29 +586,35 @@ else
         _loading = true;
         _focusTitlePending = Id == 0;
         _saveError = null;
-
-        _allPerformers = await PerformerService.GetAllAsync(includeArchived: true);
-        _studios = await StudioService.GetAllAsync();
-        _skinColors = await LookupService.GetSkinColorsAsync();
-        _boobSizes = await LookupService.GetBoobSizesAsync();
-        _assSizes = await LookupService.GetAssSizesAsync();
-        _bjTags = await LookupService.GetBjTagsAsync();
-
-        if (Id == 0)
+        _loadError = null;
+        try
         {
-            _scene = new Scene { IsDraft = true };
-        }
-        else
-        {
-            _scene = await SceneService.GetAsync(Id);
+            var performersTask = PerformerService.GetAllAsync(includeArchived: true);
+            var studiosTask = StudioService.GetAllAsync();
+            var skinTask = LookupService.GetSkinColorsAsync();
+            var boobsTask = LookupService.GetBoobSizesAsync();
+            var assTask = LookupService.GetAssSizesAsync();
+            var bjTask = LookupService.GetBjTagsAsync();
+            var sceneTask = Id == 0 ? Task.FromResult<Scene?>(new Scene { IsDraft = true }) : SceneService.GetAsync(Id);
+            await Task.WhenAll(performersTask, studiosTask, skinTask, boobsTask, assTask, bjTask, sceneTask);
+            _allPerformers = await performersTask;
+            _studios = await studiosTask;
+            _skinColors = await skinTask;
+            _boobSizes = await boobsTask;
+            _assSizes = await assTask;
+            _bjTags = await bjTask;
+            _scene = await sceneTask;
             if (!string.IsNullOrWhiteSpace(_scene?.Studio) && !_studios.Any(s => string.Equals(s.Name, _scene.Studio, StringComparison.OrdinalIgnoreCase)))
                 _studios.Add(new Studio { Name = _scene.Studio });
+            RefreshAvailable();
+            _resumeTimeText = _scene?.ResumeAtSeconds is int seconds ? PlaybackPosition.Format(seconds) : "";
         }
-
-        RefreshAvailable();
-		_resumeTimeText = _scene?.ResumeAtSeconds is int seconds ? PlaybackPosition.Format(seconds) : "";
-
-        _loading = false;
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load scene editor {SceneId}", Id);
+            _loadError = "Could not load this scene. Try again, or unlock the private area if your session expired.";
+        }
+        finally { _loading = false; }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -597,7 +625,7 @@ else
             await JS.InvokeVoidAsync("ctrlS.register", "sceneEdit", _objRef, nameof(TriggerSave), nameof(TriggerEsc));
             _jsRegistered = true;
         }
-        if (_focusTitlePending && !_loading && _scene is not null)
+        if (_focusTitlePending && !_loading && _loadError is null && _scene is not null)
         {
             _focusTitlePending = false;
             await _titleInput.FocusAsync();
@@ -607,6 +635,7 @@ else
     [Microsoft.JSInterop.JSInvokable]
     public async Task TriggerSave()
     {
+        if (IsBusy) return;
         if (_newStudioOpen) await SaveNewStudio();
         else if (_editingPerformer is not null) await SaveEditingPerformer();
         else if (_scene is not null) await SaveCurrent();
@@ -615,6 +644,7 @@ else
     [Microsoft.JSInterop.JSInvokable]
     public async Task TriggerEsc()
     {
+        if (IsBusy) return;
         if (_newStudioOpen)
         {
             CloseNewStudio();
@@ -656,6 +686,7 @@ else
 
     private void OpenNewStudio()
     {
+        if (IsBusy) return;
         _newStudioName = "";
         _studioError = null;
         _newStudioOpen = true;
@@ -670,7 +701,7 @@ else
 
     private async Task SaveNewStudio()
     {
-        if (_scene is null || _savingStudio) return;
+        if (_scene is null || IsBusy) return;
         _savingStudio = true;
         _studioError = null;
         try
@@ -693,7 +724,7 @@ else
 
     private void AddPerformer()
     {
-        if (_scene is null || _performerToAdd == 0) return;
+        if (_scene is null || IsBusy || _performerToAdd == 0) return;
         _scene.Performers.Add(new ScenePerformer { PerformerId = _performerToAdd });
         _performerToAdd = 0;
         _performerSearch = "";
@@ -702,21 +733,21 @@ else
 
     private void RemovePerformer(ScenePerformer sp)
     {
-        if (_scene is null) return;
+        if (_scene is null || IsBusy) return;
         _scene.Performers.Remove(sp);
         RefreshAvailable();
     }
 
     private void TogglePosition(Position pos, bool on)
     {
-        if (_scene is null) return;
+        if (_scene is null || IsBusy) return;
         if (on && !_scene.Positions.Contains(pos)) _scene.Positions.Add(pos);
         else if (!on) _scene.Positions.Remove(pos);
     }
 
     private void ToggleLocation(Location loc, bool on)
     {
-        if (_scene is null) return;
+        if (_scene is null || IsBusy) return;
         if (on && !_scene.Locations.Contains(loc)) _scene.Locations.Add(loc);
         else if (!on) _scene.Locations.Remove(loc);
     }
@@ -745,14 +776,26 @@ else
 
     private async Task OpenEditPerformer(int performerId)
     {
-        _editingPerformer = await PerformerService.GetAsync(performerId);
-        _performerError = null;
-        _addNewToScene = false;
-        _showExtraModal = false;
+        if (IsBusy) return;
+        _loadingPerformer = true;
+        try
+        {
+            _editingPerformer = await PerformerService.GetAsync(performerId);
+            _performerError = null;
+            _addNewToScene = false;
+            _showExtraModal = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load performer {PerformerId}", performerId);
+            _saveError = "Could not load the performer. Please try again.";
+        }
+        finally { _loadingPerformer = false; }
     }
 
     private void OpenNewPerformer()
     {
+        if (IsBusy) return;
         _editingPerformer = new Performer();
         _performerError = null;
         _addNewToScene = true;
@@ -781,7 +824,7 @@ else
 
     private async Task SaveEditingPerformer()
     {
-        if (_editingPerformer is null || _savingPerformer) return;
+        if (_editingPerformer is null || IsBusy) return;
 
         _savingPerformer = true;
         _performerError = null;
@@ -832,7 +875,7 @@ else
 
     private async Task Save(bool asDraft)
     {
-        if (_scene is null || _saving) return;
+        if (_scene is null || IsBusy) return;
 
         _saveError = null;
         _scene.Title = _scene.Title.Trim();
@@ -854,6 +897,7 @@ else
         }
 
         _saving = true;
+        var wasDraft = _scene.IsDraft;
         _scene.IsDraft = asDraft;
 
         try
@@ -862,11 +906,15 @@ else
                 await SceneService.AddAsync(_scene);
             else
                 await SceneService.UpdateAsync(_scene);
-            Nav.NavigateTo("/moviereview/scenes");
+            await JS.InvokeVoidAsync("appBusy.beginNavigation");
+            Nav.NavigateTo(asDraft ? "/moviereview/scenes" : $"/moviereview/scenes/{_scene.Id}/export");
         }
-        catch
+        catch (Exception ex)
         {
+            _scene.IsDraft = wasDraft;
+            Logger.LogError(ex, "Failed to save scene {SceneId}", _scene.Id);
             _saveError = "Could not save this scene. Please try again.";
+            await JS.InvokeVoidAsync("appBusy.endNavigation");
         }
         finally
         {

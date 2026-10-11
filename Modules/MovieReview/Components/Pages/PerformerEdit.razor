@@ -1,4 +1,4 @@
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @page "/moviereview/performers/new"
 @page "/moviereview/performers/{Id:int}"
 @using MovieReviews.Data
@@ -12,13 +12,20 @@
 
 <h1>@(Id == 0 ? "New performer" : "Edit performer")</h1>
 
+@if (_saving) { <span hidden data-app-busy="Saving performer…"></span> }
+
 @if (_loading)
 {
-    <p><em>Loading...</em></p>
+    <p data-app-busy="Loading..." role="status">Loading...</p>
 }
 else if (_performer is null)
 {
-    <p>Performer not found. <a href="/moviereview/performers">Back to list</a></p>
+    @if (_loadError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_loadError</div>
+        <button type="button" class="btn btn-primary" @onclick="OnParametersSetAsync">Try loading again</button>
+    }
+    else { <p>Performer not found. <a href="/moviereview/performers">Back to list</a></p> }
 }
 else
 {
@@ -157,7 +164,7 @@ else
         </div>
 
         <div class="performer-editor-actions">
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary" disabled="@_saving">@(_saving ? "Saving…" : "Save")</button>
             <a href="/moviereview/performers" class="btn btn-secondary">Cancel</a>
         </div>
     </EditForm>
@@ -168,6 +175,8 @@ else
 
     private Performer? _performer;
     private bool _loading = true;
+    private bool _saving;
+    private string? _loadError;
     private string? _saveError;
 
     private List<SkinColor> _skinColors = new();
@@ -183,22 +192,28 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        _loadError = null;
 
-        _skinColors = await LookupService.GetSkinColorsAsync();
-        _boobSizes = await LookupService.GetBoobSizesAsync();
-        _assSizes = await LookupService.GetAssSizesAsync();
-        _bjTags = await LookupService.GetBjTagsAsync();
-
-        if (Id == 0)
+        try
         {
-            _performer = new Performer();
+            var skinTask = LookupService.GetSkinColorsAsync();
+            var boobsTask = LookupService.GetBoobSizesAsync();
+            var assTask = LookupService.GetAssSizesAsync();
+            var bjTask = LookupService.GetBjTagsAsync();
+            var performerTask = Id == 0 ? Task.FromResult<Performer?>(new Performer()) : PerformerService.GetAsync(Id);
+            await Task.WhenAll(skinTask, boobsTask, assTask, bjTask, performerTask);
+            _skinColors = await skinTask;
+            _boobSizes = await boobsTask;
+            _assSizes = await assTask;
+            _bjTags = await bjTask;
+            _performer = await performerTask;
         }
-        else
+        catch (Exception)
         {
-            _performer = await PerformerService.GetAsync(Id);
+            _performer = null;
+            _loadError = "Could not load this performer. Try again, or unlock the private area if your session expired.";
         }
-
-        _loading = false;
+        finally { _loading = false; }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -214,13 +229,14 @@ else
     [Microsoft.JSInterop.JSInvokable]
     public async Task TriggerSave()
     {
-        if (_performer is null) return;
+        if (_performer is null || _loading || _saving) return;
         await Save();
     }
 
     [Microsoft.JSInterop.JSInvokable]
     public Task TriggerEsc()
     {
+        if (_loading || _saving) return Task.CompletedTask;
         Nav.NavigateTo("/moviereview/performers");
         return Task.CompletedTask;
     }
@@ -248,8 +264,9 @@ else
 
     private async Task Save()
     {
-        if (_performer is null) return;
+        if (_performer is null || _loading || _saving) return;
 
+        _saving = true;
         _saveError = null;
         try
         {
@@ -263,5 +280,10 @@ else
         {
             _saveError = ex.Message;
         }
+        catch (Exception)
+        {
+            _saveError = "Could not save the performer. Please try again.";
+        }
+        finally { _saving = false; }
     }
 }

@@ -26,15 +26,12 @@ public class SceneService
 	public async Task<Scene?> GetAsync(int id)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
-		var scene = await db.Scenes.FirstOrDefaultAsync(s => s.Id == id);
-		if (scene is null) return null;
-
-		scene.Performers = await db.ScenePerformers
-			.Where(sp => sp.SceneId == id)
-			.Include(sp => sp.Performer)
-			.ToListAsync();
-
-		return scene;
+		return await db.Scenes.AsNoTracking().AsSplitQuery()
+			.Include(s => s.Performers).ThenInclude(sp => sp.Performer).ThenInclude(p => p.SkinColor)
+			.Include(s => s.Performers).ThenInclude(sp => sp.Performer).ThenInclude(p => p.BoobSize)
+			.Include(s => s.Performers).ThenInclude(sp => sp.Performer).ThenInclude(p => p.AssSize)
+			.Include(s => s.Performers).ThenInclude(sp => sp.Performer).ThenInclude(p => p.BjTags)
+			.FirstOrDefaultAsync(s => s.Id == id);
 	}
 
 	public async Task<Scene> AddAsync(Scene s)
@@ -52,22 +49,20 @@ public class SceneService
 			Notes = sp.Notes
 		}).ToList();
 
-		s.Performers.Clear();
-
+		// Persist a separate graph so a failed save keeps the editor's IDs and links intact.
+		var saved = new Scene();
+		db.Entry(saved).CurrentValues.SetValues(s);
 		var now = DateTime.UtcNow;
-		s.CreatedDate = now;
-		s.LastUpdate = now;
-		s.IsPinnedDraft = s.IsDraft && s.IsPinnedDraft;
-
-		db.Scenes.Add(s);
+		saved.CreatedDate = now;
+		saved.LastUpdate = now;
+		saved.IsPinnedDraft = s.IsDraft && s.IsPinnedDraft;
+		saved.Performers = links;
+		db.Scenes.Add(saved);
 		await db.SaveChangesAsync();
-
-		foreach (var l in links)
-		{
-			l.SceneId = s.Id;
-			db.ScenePerformers.Add(l);
-		}
-		await db.SaveChangesAsync();
+		s.Id = saved.Id;
+		s.CreatedDate = saved.CreatedDate;
+		s.LastUpdate = saved.LastUpdate;
+		s.IsPinnedDraft = saved.IsPinnedDraft;
 
 		return s;
 	}
@@ -91,6 +86,8 @@ public class SceneService
 		existing.SetupModifier = s.SetupModifier;
 		existing.SetupNotes = s.SetupNotes;
 		existing.SetupSpeaksNoEnglish = s.SetupSpeaksNoEnglish;
+		existing.SetupWeird = s.SetupWeird;
+		existing.SetupDumb = s.SetupDumb;
 		existing.SexRating = s.SexRating;
 		existing.SexModifier = s.SexModifier;
 		existing.SexNotes = s.SexNotes;
@@ -102,7 +99,6 @@ public class SceneService
 
 		var oldLinks = await db.ScenePerformers.Where(sp => sp.SceneId == s.Id).ToListAsync();
 		db.ScenePerformers.RemoveRange(oldLinks);
-		await db.SaveChangesAsync();
 
 		foreach (var sp in s.Performers)
 		{

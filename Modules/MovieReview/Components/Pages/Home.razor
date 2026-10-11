@@ -30,7 +30,7 @@
         <div class="panel-header"><div><div class="eyebrow">PICK UP WHERE YOU LEFT OFF</div><h3>Recent reviews</h3></div><a href="/moviereview/scenes">View all →</a></div>
         @if (_loading)
         {
-            <p class="panel-empty">Loading your reviews...</p>
+            <p class="panel-empty" data-app-busy="Loading your reviews..." role="status">Loading your reviews...</p>
         }
         else if (_sceneCount == 0)
         {
