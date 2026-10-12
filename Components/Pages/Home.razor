@@ -62,7 +62,7 @@
                         @if (selectedId is not null && selectedItem?.Kind == MediaKind.Series && mediaForm.Kind == MediaKind.Series)
                         {
                             <div class="episodes field wide">
-                                <div class="section-heading"><h2>Episodes <span>@selectedItem.Episodes.Count</span></h2><button type="button" class="text-button" @onclick="AddEpisode">+ Add episode</button></div>
+                                <div class="section-heading"><h2>Episodes <span>@selectedItem.Episodes.Count</span></h2><div><button type="button" class="text-button" @onclick="AddSeason">+ Add season</button><button type="button" class="text-button" @onclick="AddEpisode">+ Add episode</button></div></div>
                                 <p class="episode-hint">Click a rating to edit · Enter or Tab to save · Click an episode for notes</p>
                                 <div class="episode-list">
                                     @foreach (var episode in selectedItem.Episodes.OrderBy(x => x.SeasonNumber).ThenBy(x => x.EpisodeNumber))
@@ -94,6 +94,20 @@
                     </div>
                     <div class="form-actions"><button type="submit" class="button primary">@(selectedId is null ? "Save title" : "Save changes")</button>@if (selectedId is not null) { <button type="button" class="button ghost" @onclick="StartNew">New entry</button> }</div>
                 </EditForm>
+
+                <dialog @ref="seasonDialog" class="episode-dialog" aria-labelledby="season-dialog-heading" @oncancel="CloseSeason">
+                    <div class="section-heading"><h2 id="season-dialog-heading">Add season</h2><button type="button" class="text-button" @onclick="CloseSeason" aria-label="Close season dialog">✕</button></div>
+                    <p>Create episodes 1 through the number below. Existing episodes, ratings and notes are kept. Specials (episode 0) are unchanged.</p>
+                    @if (!string.IsNullOrWhiteSpace(seasonError)) { <p class="validation-message" role="alert">@seasonError</p> }
+                    <EditForm Model="seasonForm" OnValidSubmit="SaveSeason" FormName="season">
+                        <DataAnnotationsValidator />
+                        <div class="form-grid">
+                            <div class="field"><label for="season-number">Season</label><InputNumber id="season-number" @bind-Value="seasonForm.SeasonNumber" min="1" max="999" /><ValidationMessage For="() => seasonForm.SeasonNumber" /></div>
+                            <div class="field"><label for="season-count">Number of episodes</label><InputNumber id="season-count" @bind-Value="seasonForm.EpisodeCount" min="1" max="9999" /><ValidationMessage For="() => seasonForm.EpisodeCount" /></div>
+                        </div>
+                        <div class="form-actions"><button class="button primary" type="submit" disabled="@savingSeason">@(savingSeason ? "Adding…" : "Add season")</button><button class="button ghost" type="button" @onclick="CloseSeason" disabled="@savingSeason">Cancel</button></div>
+                    </EditForm>
+                </dialog>
 
                 <dialog @ref="episodeDialog" class="episode-dialog" aria-labelledby="episode-dialog-heading" @oncancel="CloseEpisode" @onclose="ResetEpisode">
                     <div class="section-heading"><h2 id="episode-dialog-heading">@(editingEpisodeId is null ? "Add episode" : EpisodeLabel(episodeForm))</h2><button type="button" class="text-button" @onclick="CloseEpisode" aria-label="Close episode dialog">✕</button></div>

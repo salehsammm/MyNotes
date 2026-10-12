@@ -2,7 +2,7 @@ export function openEpisode(dialog) {
     if (!dialog.open) dialog.showModal();
     // Blazor updates the dialog fields after the click handler finishes.
     requestAnimationFrame(() => {
-        const rating = dialog.querySelector('#episode-rating');
+        const rating = dialog.querySelector('#episode-rating, #season-number');
         rating?.focus();
         rating?.select();
     });
