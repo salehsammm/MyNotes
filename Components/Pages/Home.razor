@@ -15,7 +15,7 @@
     </header>
 
     <main>
-        <nav class="journal-actions journal-toolbar" aria-label="Journal actions"><button class="button primary" @onclick="StartNew">+ Add a title</button><a class="button ghost" href="/journal/lists">My lists →</a></nav>
+        <nav class="journal-actions journal-toolbar" aria-label="Journal actions"><button class="button primary" @onclick="StartNew">+ Add a title</button><a class="button ghost" href="/journal/lists">My lists →</a><a class="button ghost" href="/journal/notes">Personal notes &amp; diary →</a></nav>
 
         @if (!string.IsNullOrWhiteSpace(error))
         {

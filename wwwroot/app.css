@@ -103,3 +103,24 @@ footer span { color: #bad182; margin: 0 8px; }
 .journal-toolbar ~ .workspace { padding-top: 24px; }
 .journal-actions a, .journal-brand { text-decoration: none; color: inherit; }
 .journal-actions a { display: inline-flex; align-items: center; }
+.notes-workspace { grid-template-columns: minmax(280px, 350px) minmax(0, 1fr); }
+.notes-search { margin-bottom: 22px; }
+.notes-search > label { display: block; color: #a8afa6; font-size: 11px; margin-bottom: 8px; }
+.notes-search .search { margin-bottom: 12px; }
+.notes-search-options { margin: 12px 0; }
+.notes-search-options > summary, .note-sections > summary { color: #c5df8b; cursor: pointer; font-size: 12px; }
+.notes-search-options .form-grid { gap: 12px; padding-top: 14px; }
+.notes-search-options .field input, .notes-search-options .field select { height: 38px; font-size: 12px; color-scheme: dark; }
+.notes-search-options .field label { margin-bottom: 6px; }
+.notes-search-actions { display: flex; align-items: center; gap: 12px; }
+.notes-search-actions .button { padding: 8px 16px; }
+.note-excerpt { color: #a8afa6; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.notes-workspace .item-main strong { white-space: normal; overflow-wrap: anywhere; }
+.note-sections > summary { margin-bottom: 16px; }
+.note-sections > summary span { color: #8b968c; }
+.note-sections .field + .field { margin-top: 20px; }
+.note-fieldset { padding: 0; margin: 0; min-width: 0; border: 0; }
+.note-save-state, .note-metadata { font-size: 11px; color: #8b968c; }
+.note-metadata { margin-top: 20px; }
+.notes-unsaved { background: #3b3524; color: #f3dfab; flex-wrap: wrap; align-items: center; }
+@media (max-width: 750px) { .notes-workspace { grid-template-columns: 1fr; } }

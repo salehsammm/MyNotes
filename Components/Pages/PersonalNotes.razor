@@ -1,0 +1,95 @@
+@page "/journal/notes"
+@rendermode InteractiveServer
+@using MyNotes.Data
+@using Microsoft.AspNetCore.Components.Routing
+@inject Microsoft.EntityFrameworkCore.IDbContextFactory<MediaDbContext> DbFactory
+@inject IJSRuntime JS
+
+<PageTitle>Personal notes · Frame Notes</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@dirty" OnBeforeInternalNavigation="BeforeNavigation" />
+
+<div class="shell">
+    <header class="topbar">
+        <a class="brand journal-brand" href="/journal"><span class="brand-mark">✳</span><span>FRAME<span class="brand-light">NOTES</span></span></a>
+        <a class="text-button" href="/journal">← Media journal</a>
+    </header>
+    <main>
+        <nav class="journal-actions journal-toolbar" aria-label="Personal notes actions">
+            <button class="button primary" @onclick="() => RequestNew(PersonalNoteKind.Note)" disabled="@busy">+ New note</button>
+            <button class="button ghost" @onclick="() => RequestNew(PersonalNoteKind.Diary)" disabled="@busy">+ Today's diary</button>
+        </nav>
+        @if (error is not null) { <div class="notice error" role="alert">@error <button @onclick="() => error = null">×</button></div> }
+        @if (message is not null) { <div class="notice success" role="status">@message <button @onclick="() => message = null">×</button></div> }
+        @if (pendingAction is not null)
+        {
+            <div class="notice notes-unsaved" role="alert"><span>You have unsaved changes.</span><div><button type="button" class="text-button" @onclick="DiscardChanges">Discard and continue</button><button type="button" class="text-button" @onclick="() => pendingAction = null">Keep editing</button></div></div>
+        }
+        <div class="workspace notes-workspace">
+            <aside class="library">
+                <div class="section-heading"><h2>Personal notes <span>@resultCount</span></h2></div>
+                <form @onsubmit="Search" @onsubmit:preventDefault class="notes-search">
+                    <label for="note-search">Words or phrase</label>
+                    <input id="note-search" class="search" @bind="searchText" @bind:event="oninput" placeholder="Search all note sections…" />
+                    <div class="filter-row" aria-label="Note type filter">
+                        @foreach (var choice in new[] { "All", "Notes", "Diary" })
+                        {
+                            <button type="button" class="filter @(kindFilter == choice ? "active" : "")" @onclick="() => FilterKind(choice)" disabled="@busy">@choice</button>
+                        }
+                    </div>
+                    <details class="notes-search-options">
+                        <summary>Search options</summary>
+                        <div class="form-grid">
+                            <div class="field wide"><label for="note-match">Match</label><select id="note-match" @bind="matchMode"><option value="all">All words</option><option value="any">Any word</option><option value="phrase">Exact phrase</option></select></div>
+                            <div class="field wide"><label for="note-scope">Search in</label><select id="note-scope" @bind="searchScope"><option value="all">All sections</option><option value="title">Title</option><option value="details">Details / diary entry</option><option value="conclusion">Understanding &amp; conclusion</option><option value="summary">Summary</option></select></div>
+                            <div class="field wide"><label for="note-category-filter">Category</label><select id="note-category-filter" @bind="categoryFilter"><option value="">All categories</option><option value="__none">Uncategorized</option>@foreach (var category in categories) { <option value="@category">@category</option> }</select></div>
+                            <div class="field"><label for="note-from">From date</label><input id="note-from" type="date" @bind="fromDate" /></div>
+                            <div class="field"><label for="note-to">To date</label><input id="note-to" type="date" @bind="toDate" /></div>
+                            <div class="field wide"><label for="note-sort">Sort</label><select id="note-sort" @bind="sortOrder"><option value="date-desc">Newest note date</option><option value="date-asc">Oldest note date</option><option value="updated">Recently edited</option><option value="title">Title A–Z</option></select></div>
+                        </div>
+                    </details>
+                    <div class="notes-search-actions"><button type="submit" class="button ghost" disabled="@busy">Search</button><button type="button" class="text-button" @onclick="ClearSearch" disabled="@busy">Reset</button></div>
+                </form>
+                <div class="library-list">
+                    @foreach (var note in notes)
+                    {
+                        <button class="library-item @(selectedId == note.Id ? "selected" : "")" @onclick="() => RequestSelect(note.Id)" disabled="@busy" @key="note.Id">
+                            <span class="item-icon">@(note.Kind == PersonalNoteKind.Diary ? "◷" : "▤")</span>
+                            <span class="item-main"><strong>@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(note.Category ?? "Uncategorized")</small><span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
+                        </button>
+                    }
+                    @if (!busy && notes.Count == 0) { <p class="empty-list">No notes found. Write a note or start today's diary above.</p> }
+                </div>
+                @if (notes.Count < resultCount) { <button class="text-button" @onclick="LoadMore" disabled="@busy">Show more (@(resultCount - notes.Count) remaining)</button> }
+            </aside>
+            <section class="editor">
+                <div class="section-heading"><h2>@(selectedId is null ? (form.Kind == PersonalNoteKind.Diary ? "New diary entry" : "New note") : (form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Your note"))</h2><span class="note-save-state" role="status">@(dirty ? "Unsaved changes" : selectedId is not null ? "Saved" : "")</span></div>
+                <EditForm EditContext="editContext" OnValidSubmit="SaveNote" FormName="personal-note">
+                    <DataAnnotationsValidator />
+                    <fieldset class="note-fieldset" disabled="@busy">
+                        <div class="form-grid">
+                            <div class="field wide"><label for="note-title">Title</label><InputText id="note-title" @bind-Value="form.Title" @oninput="MarkDirty" dir="auto" /><ValidationMessage For="() => form.Title" /></div>
+                            <div class="field"><label for="note-kind">Type</label><InputSelect id="note-kind" @bind-Value="form.Kind"><option value="Note">Note</option><option value="Diary">Diary</option></InputSelect></div>
+                            <div class="field"><label for="note-date">@(form.Kind == PersonalNoteKind.Diary ? "Diary date" : "Note date")</label><InputDate id="note-date" @bind-Value="form.NoteDate" /><ValidationMessage For="() => form.NoteDate" /></div>
+                            <div class="field wide"><label for="note-category">Category <span>optional · choose or type your own</span></label><InputText id="note-category" @bind-Value="form.Category" @oninput="MarkDirty" list="note-categories" placeholder="e.g. Food, Life" dir="auto" /><ValidationMessage For="() => form.Category" /><datalist id="note-categories">@foreach (var category in categories) { <option value="@category" /> }</datalist></div>
+                            <div class="field wide"><label for="note-details">@(form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Details") <span>optional · write freely</span></label><InputTextArea id="note-details" @bind-Value="form.Details" @oninput="MarkDirty" rows="10" dir="auto" /></div>
+                            <details class="field wide note-sections" open="@(form.Kind == PersonalNoteKind.Note || !string.IsNullOrWhiteSpace(form.Conclusion) || !string.IsNullOrWhiteSpace(form.Summary))">
+                                <summary>Understanding, conclusion &amp; summary <span>optional</span></summary>
+                                <div class="field"><label for="note-conclusion">My understanding &amp; conclusion</label><InputTextArea id="note-conclusion" @bind-Value="form.Conclusion" @oninput="MarkDirty" rows="5" dir="auto" /></div>
+                                <div class="field"><label for="note-summary">Summary</label><InputTextArea id="note-summary" @bind-Value="form.Summary" @oninput="MarkDirty" rows="3" dir="auto" /></div>
+                            </details>
+                        </div>
+                        <div class="form-actions"><button type="submit" class="button primary">Save @(form.Kind == PersonalNoteKind.Diary ? "diary entry" : "note")</button></div>
+                    </fieldset>
+                </EditForm>
+                @if (selectedId is not null)
+                {
+                    <div class="note-metadata">Created @LocalTimestamp(form.CreatedAtUtc) · Edited @LocalTimestamp(form.UpdatedAtUtc)</div>
+                    <div class="delete-area">
+                        @if (confirmDelete) { <span>Delete this note?</span><button class="danger-link" @onclick="DeleteNote" disabled="@busy">Yes, delete</button><button class="text-button" @onclick="() => confirmDelete = false">Cancel</button> }
+                        else { <button class="danger-link" @onclick="() => confirmDelete = true" disabled="@busy">Delete note</button> }
+                    </div>
+                }
+            </section>
+        </div>
+    </main>
+</div>

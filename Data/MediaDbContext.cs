@@ -6,9 +6,22 @@ public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContex
 {
     public DbSet<MediaItem> MediaItems => Set<MediaItem>();
     public DbSet<Episode> Episodes => Set<Episode>();
+    public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<PersonalNote>(entity =>
+        {
+            entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.Details).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.Conclusion).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.Summary).HasColumnType("nvarchar(max)");
+            entity.HasIndex(x => x.NoteDate);
+            entity.HasIndex(x => x.Category);
+            entity.ToTable(t => t.HasCheckConstraint("CK_PersonalNotes_Kind", "[Kind] IN (1, 2)"));
+        });
+
         modelBuilder.Entity<MediaItem>(entity =>
         {
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();

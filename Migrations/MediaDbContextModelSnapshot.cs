@@ -17,6 +17,56 @@ public class MediaDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 128);
         modelBuilder.UseIdentityColumns();
 
+        modelBuilder.Entity("MyNotes.Data.PersonalNote", b =>
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                b.Property<string>("Category")
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
+
+                b.Property<string>("Conclusion")
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<DateTime>("CreatedAtUtc")
+                    .HasColumnType("datetime2");
+
+                b.Property<string>("Details")
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<int>("Kind")
+                    .HasColumnType("int");
+
+                b.Property<DateOnly>("NoteDate")
+                    .HasColumnType("date");
+
+                b.Property<string>("Summary")
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
+
+                b.Property<DateTime>("UpdatedAtUtc")
+                    .HasColumnType("datetime2");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Category");
+
+                b.HasIndex("NoteDate");
+
+                b.ToTable("PersonalNotes", t =>
+                    {
+                        t.HasCheckConstraint("CK_PersonalNotes_Kind", "[Kind] IN (1, 2)");
+                    });
+            });
+
         modelBuilder.Entity("MyNotes.Data.MediaItem", b =>
         {
             b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("int");

@@ -23,6 +23,14 @@ At startup, `Program.cs` calls `Database.MigrateAsync()`. This creates the datab
 
 On 2026-10-06, the user-provided desktop note file was imported directly into the local database: 40 titles and 180 episodes. The file is not copied into the repository or seeded in migrations. A title beginning with `**` was marked as saved to both IMDb and Letterboxd; other titles remain unchecked even if the note mentions those sites. The earlier unlabelled `Silo` episode list conflicts with a later explicit season 1 list, so it is preserved in the series review while the explicit season lists supply episode rows. `Win or Lose` lists E07 twice with different ratings; the first value is the episode rating and the second is preserved in the series review. Unassigned reminders and trailing `E01`–`E24` placeholders were not interpreted as ratings.
 
+## Personal notes and diary
+
+`/journal/notes` is linked from the journal toolbar. Personal notes have a title, note date, optional custom category, and separate Details, My understanding & conclusion, and Summary sections. Diary entries start with today's date in the Asia/Tehran time zone and a suggested title; their freeform entry is prominent, with conclusion and summary optional. Multiple entries per day are allowed. Dates remain editable for past entries.
+
+Search combines all words, any word, or an exact phrase with section, type, category, and inclusive note-date filters. Sort by note date, most recent edit, or title; results load 50 at a time. Text is stored as Unicode without stripping paragraphs. Creation/edit timestamps are stored in UTC and displayed in Tehran time. Switching entries or leaving the page warns about unsaved changes; notes use explicit Save. This section has the same access as the media journal.
+
+`Data/PersonalNote.cs`, `Components/Pages/PersonalNotes.razor` and `.razor.cs` implement the first version, backed by the existing journal database and an additive migration. The three sections can be extended after reviewing real examples of the user's writing.
+
 ## Code map
 
 - `Data/MediaItem.cs`, `Data/Episode.cs`: domain records and input validation.
