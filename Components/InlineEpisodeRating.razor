@@ -1,0 +1,68 @@
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using MyNotes.Data
+@inject IDbContextFactory<MediaDbContext> DbFactory
+
+<div class="inline-episode-rating">
+    <input class="episode-rating-box" type="text" inputmode="decimal" aria-label="@($"Rating for {Label}, out of 10")" placeholder="?" @bind="value" @bind:event="oninput" @onblur="Save" onfocus="this.select()" onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" disabled="@saving" aria-invalid="@(error is not null ? "true" : "false")" />
+    @if (error is not null) { <span class="inline-rating-status validation-message" role="alert">@error</span> }
+    else if (saved) { <span class="inline-rating-status" role="status">Saved</span> }
+</div>
+
+@code {
+    [Parameter] public int EpisodeId { get; set; }
+    [Parameter] public int MediaItemId { get; set; }
+    [Parameter] public decimal? Rating { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public EventCallback OnSaved { get; set; }
+    private decimal? lastRating;
+    private bool initialized;
+    private string value = "";
+    private string? error;
+    private bool saving;
+    private bool saved;
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized || Rating != lastRating)
+        {
+            value = Rating?.ToString("0.#", CultureInfo.InvariantCulture) ?? "";
+            lastRating = Rating;
+            initialized = true;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (saving) return;
+        saved = false;
+        error = null;
+        decimal? rating = null;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (!decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed) || parsed < 0 || parsed > 10 || parsed != decimal.Round(parsed, 1))
+            {
+                error = "Use 0–10, with at most one decimal.";
+                return;
+            }
+            rating = parsed;
+        }
+        if (rating == lastRating) return;
+        saving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var episode = await db.Episodes.Include(x => x.MediaItem).FirstOrDefaultAsync(x => x.Id == EpisodeId && x.MediaItemId == MediaItemId && x.MediaItem.Kind == MediaKind.Series);
+            if (episode is null) { error = "Episode no longer available."; return; }
+            episode.Rating = rating;
+            episode.MediaItem.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            lastRating = rating;
+            value = rating?.ToString("0.#", CultureInfo.InvariantCulture) ?? "";
+            saved = true;
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception) { error = "Could not save. Click the rating and try again."; }
+        finally { saving = false; }
+    }
+}
