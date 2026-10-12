@@ -78,3 +78,8 @@ footer span { color: #bad182; margin: 0 8px; }
 
 .topbar-caption .private-entry { color: inherit; text-decoration: none; }
 .topbar-caption .private-entry:focus-visible { outline: 1px solid currentColor; outline-offset: 4px; }
+.journal-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.journal-toolbar { padding: 18px 0; border-bottom: 1px solid #2b302c; }
+.journal-toolbar ~ .workspace { padding-top: 24px; }
+.journal-actions a, .journal-brand { text-decoration: none; color: inherit; }
+.journal-actions a { display: inline-flex; align-items: center; }

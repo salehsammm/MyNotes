@@ -6,13 +6,6 @@
 
 <PageTitle>Overview · MovieReviews</PageTitle>
 
-<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / OVERVIEW</div><h1>Good to have you back.</h1><p>Pick up where you left off, or add something new to your collection.</p></div></div>
-
-<section class="dashboard-hero">
-    <div class="hero-content"><span class="hero-kicker">YOUR CREATIVE SPACE</span><h2>Every scene has<br />a story worth keeping.</h2><p>Organize reviews, capture ideas, and keep your favorites close.</p><div class="hero-actions"><a href="/moviereview/scenes/new" class="btn btn-light">+ Write a review</a><a href="/moviereview/scenes" class="hero-link">Explore collection <span>→</span></a></div></div>
-    <div class="hero-art" aria-hidden="true"><div class="film-ring ring-one"></div><div class="film-ring ring-two"></div><div class="hero-card"><span>✦</span><i></i><i></i><i></i></div></div>
-</section>
-
 @if (!_loading && _draftCount > 0)
 {
     <div class="draft-reminder"><div><strong>@_draftCount unfinished scene @(_draftCount == 1 ? "review" : "reviews")</strong><span>Your drafts are saved and ready when you are.</span></div><a href="/moviereview/scenes?status=draft" class="btn btn-outline-secondary">Continue drafts →</a></div>

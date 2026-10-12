@@ -13,12 +13,7 @@
     </header>
 
     <main>
-        <section class="hero">
-            <div class="eyebrow">A SPACE FOR WHAT STAYS WITH YOU</div>
-            <h1>Every story leaves<br><em>an impression.</em></h1>
-            <p>Keep your movie reviews and rate each episode as you go. Your notes stay in your own SQL Server database.</p>
-            <button class="button primary" @onclick="StartNew">+ Add a title</button>
-        </section>
+        <nav class="journal-actions journal-toolbar" aria-label="Journal actions"><button class="button primary" @onclick="StartNew">+ Add a title</button><a class="button ghost" href="/journal/lists">My lists →</a></nav>
 
         @if (!string.IsNullOrWhiteSpace(error))
         {
@@ -44,7 +39,7 @@
                     {
                         <button class="library-item @(selectedId == item.Id ? "selected" : "")" @onclick="() => SelectItem(item.Id)" @key="item.Id">
                             <span class="item-icon">@(item.Kind == MediaKind.Movie ? "◈" : "▣")</span>
-                            <span class="item-main"><strong>@item.Title</strong><small>@item.Kind · @(item.ReleaseYear?.ToString() ?? "Year unknown") @if (item.SavedToImdb) { <span title="Saved to IMDb"> · IMDb ✓</span> } @if (item.SavedToLetterboxd) { <span title="Saved to Letterboxd"> · Letterboxd ✓</span> }</small></span>
+                            <span class="item-main"><strong>@item.Title</strong><small>@item.Kind · @(item.ReleaseYear?.ToString() ?? "Year unknown") @if (item.SavedToImdb) { <span title="Saved to IMDb"> · IMDb ✓</span> } @if (item.Kind == MediaKind.Movie && item.SavedToLetterboxd) { <span title="Saved to Letterboxd"> · Letterboxd ✓</span> }</small></span>
                             <span class="rating-pill">@(item.Rating?.ToString("0.#") ?? "—")</span>
                         </button>
                     }
@@ -64,7 +59,14 @@
                         <div class="field"><label for="media-kind">Type</label><InputSelect id="media-kind" @bind-Value="mediaForm.Kind"><option value="Movie">Movie</option><option value="Series">TV series</option></InputSelect></div>
                         <div class="field"><label for="media-year">Release year <span>optional</span></label><InputNumber id="media-year" @bind-Value="mediaForm.ReleaseYear" placeholder="2025" /><ValidationMessage For="() => mediaForm.ReleaseYear" /></div>
                         <div class="field"><label for="media-rating">Overall rating <span>optional</span></label><div class="rating-input"><InputNumber id="media-rating" @bind-Value="mediaForm.Rating" min="0" max="10" step="0.1" placeholder="—" /><span>/ 10</span></div><ValidationMessage For="() => mediaForm.Rating" /></div>
-                        <div class="field wide saved-flags"><label>Also saved on</label><label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToImdb" /> IMDb</label><label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToLetterboxd" /> Letterboxd</label></div>
+                        <div class="field wide saved-flags">
+                            <label>Also saved on</label>
+                            <label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToImdb" /> IMDb</label>
+                            @if (mediaForm.Kind == MediaKind.Movie)
+                            {
+                                <label class="check-label"><InputCheckbox @bind-Value="mediaForm.SavedToLetterboxd" /> Letterboxd</label>
+                            }
+                        </div>
                         <div class="field wide"><label for="media-review">Review <span>optional · any language</span></label><InputTextArea id="media-review" @bind-Value="mediaForm.Review" rows="7" placeholder="What did you think?" /></div>
                     </div>
                     <div class="form-actions"><button type="submit" class="button primary">@(selectedId is null ? "Save title" : "Save changes")</button>@if (selectedId is not null) { <button type="button" class="button ghost" @onclick="StartNew">New entry</button> }</div>

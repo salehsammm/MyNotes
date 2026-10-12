@@ -15,7 +15,7 @@ At startup, `Program.cs` calls `Database.MigrateAsync()`. This creates the datab
 ## Data model
 
 - `MediaItem` represents either a movie or a series. It stores the title, optional release year, optional overall rating out of 10, and freeform Unicode review text.
-- `SavedToImdb` and `SavedToLetterboxd` are independent checkboxes on each title. The library has a **Not on IMDb** filter.
+- `SavedToImdb` is a checkbox on each title; `SavedToLetterboxd` is shown only for movies, including its library indicator. The library has a **Not on IMDb** filter.
 - `Episode` belongs to a series and stores season/episode numbers, optional title, optional rating, and freeform Unicode notes or review.
 - A null rating means **not rated yet** (`?` in the sample notes). Ratings can have one decimal place and must be between 0 and 10. Seasons start at 1; episode 0 is allowed for a special. Each season/episode pair is unique within a series.
 - Deleting a series deletes its episodes. Changing a series into a movie should be done only after its episodes are removed; the UI should preserve those notes until the user explicitly deletes them.
