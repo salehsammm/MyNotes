@@ -32,6 +32,10 @@ Search combines all words, any word, or an exact phrase with section, type, cate
 
 `Data/PersonalNote.cs`, `Components/Pages/PersonalNotes.razor` and `.razor.cs` implement the first version, backed by the existing journal database and an additive migration. The three sections can be extended after reviewing real examples of the user's writing.
 
+Notes can optionally belong to a named group such as “Limitless Book” under Life. Each point is a separate topic/note with its own details, conclusion, summary, and ordered research entries. Research entries label Website, AI, or Other, with optional source name and an HTTP(S) link. Research text, source names, and links are included in word/phrase search, or searched separately using the Research & sources scope. Search can be limited to one group, ungrouped notes, or all notes, combined with category, date, and type filters.
+
+A grouped note uses its group's category; group renaming or recategorization does not rewrite its writing. Existing notes remain ungrouped until moved with the Note group selector. Groups can only be deleted when empty; topics must first be moved out. Research is saved with its topic, and deleting a topic deletes its research entries. Removing research while editing is pending until Save. Diaries remain freeform and ungrouped by default.
+
 ## Code map
 
 - `Data/MediaItem.cs`, `Data/Episode.cs`: domain records and input validation.

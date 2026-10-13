@@ -16,6 +16,9 @@ public class PersonalNote
     public string? Details { get; set; }
     public string? Conclusion { get; set; }
     public string? Summary { get; set; }
+    public int? NoteGroupId { get; set; }
+    public NoteGroup? NoteGroup { get; set; }
+    public List<NoteResearch> ResearchEntries { get; set; } = [];
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

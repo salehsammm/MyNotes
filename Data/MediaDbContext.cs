@@ -7,9 +7,28 @@ public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContex
     public DbSet<MediaItem> MediaItems => Set<MediaItem>();
     public DbSet<Episode> Episodes => Set<Episode>();
     public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
+    public DbSet<NoteGroup> NoteGroups => Set<NoteGroup>();
+    public DbSet<NoteResearch> NoteResearch => Set<NoteResearch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<NoteGroup>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.Description).HasColumnType("nvarchar(max)");
+            entity.HasIndex(x => x.Category);
+        });
+        modelBuilder.Entity<NoteResearch>(entity =>
+        {
+            entity.Property(x => x.SourceName).HasMaxLength(200);
+            entity.Property(x => x.SourceUrl).HasMaxLength(2048);
+            entity.Property(x => x.Content).HasColumnType("nvarchar(max)").IsRequired();
+            entity.HasOne(x => x.PersonalNote).WithMany(x => x.ResearchEntries)
+                .HasForeignKey(x => x.PersonalNoteId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.PersonalNoteId, x.Position });
+            entity.ToTable(t => t.HasCheckConstraint("CK_NoteResearch_SourceKind", "[SourceKind] IN (1, 2, 3)"));
+        });
         modelBuilder.Entity<PersonalNote>(entity =>
         {
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
@@ -17,6 +36,8 @@ public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContex
             entity.Property(x => x.Details).HasColumnType("nvarchar(max)");
             entity.Property(x => x.Conclusion).HasColumnType("nvarchar(max)");
             entity.Property(x => x.Summary).HasColumnType("nvarchar(max)");
+            entity.HasOne(x => x.NoteGroup).WithMany(x => x.Notes)
+                .HasForeignKey(x => x.NoteGroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.NoteDate);
             entity.HasIndex(x => x.Category);
             entity.ToTable(t => t.HasCheckConstraint("CK_PersonalNotes_Kind", "[Kind] IN (1, 2)"));

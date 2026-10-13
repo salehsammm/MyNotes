@@ -48,6 +48,7 @@ public partial class PersonalNotes
         dirty = false;
         confirmDelete = false;
         pendingAction = null;
+        showGroupEditor = groupDirty = false;
     }
 
     private void MarkDirty(ChangeEventArgs _) => dirty = true;
@@ -56,23 +57,25 @@ public partial class PersonalNotes
     {
         selectedId = null;
         error = message = null;
-        SetForm(new() { Kind = kind, NoteDate = Today, Title = kind == PersonalNoteKind.Diary ? $"Diary · {Today:yyyy-MM-dd}" : "" });
+        SetForm(new() { Kind = kind, NoteDate = Today, Title = kind == PersonalNoteKind.Diary ? $"Diary · {Today:yyyy-MM-dd}" : "", NoteGroupId = kind == PersonalNoteKind.Note && groupFilter > 0 ? groupFilter : null, Category = kind == PersonalNoteKind.Note && groupFilter > 0 ? groups.FirstOrDefault(g => g.Id == groupFilter)?.Category : null });
         return Task.CompletedTask;
     });
 
     private Task RequestSelect(int id) => RequestChange(() => Run(async () =>
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        var note = await db.PersonalNotes.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+        var note = await db.PersonalNotes.AsNoTracking().Include(x => x.NoteGroup).Include(x => x.ResearchEntries).SingleOrDefaultAsync(x => x.Id == id);
         if (note is null) { error = "This note no longer exists. Search again to refresh the list."; return; }
         selectedId = note.Id;
+        note.Category = EffectiveCategory(note);
+        note.ResearchEntries = note.ResearchEntries.OrderBy(e => e.Position).ThenBy(e => e.Id).ToList();
         SetForm(note);
     }));
 
     private Task RequestChange(Func<Task> action)
     {
         if (busy) return Task.CompletedTask;
-        if (dirty) { pendingAction = action; return Task.CompletedTask; }
+        if (dirty || groupDirty) { pendingAction = action; pendingGroupOnly = false; return Task.CompletedTask; }
         return action();
     }
 
@@ -80,13 +83,15 @@ public partial class PersonalNotes
     {
         var action = pendingAction;
         pendingAction = null;
-        dirty = false;
+        if (!pendingGroupOnly) dirty = false;
+        groupDirty = false;
+        pendingGroupOnly = false;
         if (action is not null) await action();
     }
 
     private async Task BeforeNavigation(LocationChangingContext context)
     {
-        if (dirty && !await JS.InvokeAsync<bool>("confirm", "Discard unsaved note changes and leave this page?")) context.PreventNavigation();
+        if ((dirty || groupDirty) && !await JS.InvokeAsync<bool>("confirm", "Discard unsaved changes and leave this page?")) context.PreventNavigation();
     }
 
     private async Task Run(Func<Task> action)
@@ -95,7 +100,7 @@ public partial class PersonalNotes
         busy = true;
         error = message = null;
         try { await action(); }
-        catch (Exception) { error = "Could not update your notes. Your writing is still here; please try again."; }
+        catch (Exception ex) { Logger.LogError(ex, "Personal notes operation failed"); error = "Could not update your notes. Your writing is still here; please try again."; }
         finally { busy = false; }
     }
 
@@ -105,6 +110,7 @@ public partial class PersonalNotes
     private Task ClearSearch()
     {
         searchText = categoryFilter = "";
+        groupFilter = 0;
         kindFilter = "All";
         matchMode = searchScope = "all";
         fromDate = toDate = null;
@@ -120,32 +126,18 @@ public partial class PersonalNotes
             return;
         }
         await using var db = await DbFactory.CreateDbContextAsync();
-        var query = db.PersonalNotes.AsNoTracking().AsQueryable();
+        var query = db.PersonalNotes.AsNoTracking().Include(n => n.NoteGroup).AsQueryable();
+        if (groupFilter > 0) query = query.Where(n => n.NoteGroupId == groupFilter);
+        if (groupFilter == -1) query = query.Where(n => n.NoteGroupId == null);
         if (kindFilter == "Notes") query = query.Where(n => n.Kind == PersonalNoteKind.Note);
         if (kindFilter == "Diary") query = query.Where(n => n.Kind == PersonalNoteKind.Diary);
-        if (categoryFilter == "__none") query = query.Where(n => n.Category == null);
-        else if (!string.IsNullOrEmpty(categoryFilter)) query = query.Where(n => n.Category == categoryFilter);
+        if (categoryFilter == "__none") query = query.Where(n => n.NoteGroupId != null ? n.NoteGroup!.Category == null : n.Category == null);
+        else if (!string.IsNullOrEmpty(categoryFilter)) query = query.Where(n => (n.NoteGroupId != null ? n.NoteGroup!.Category : n.Category) == categoryFilter);
         if (fromDate is DateOnly first) query = query.Where(n => n.NoteDate >= first);
         if (toDate is DateOnly last) query = query.Where(n => n.NoteDate <= last);
         var terms = matchMode == "phrase" ? new[] { searchText.Trim() } : searchText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         terms = terms.Where(t => t.Length > 0).ToArray();
-        if (terms.Length > 0)
-        {
-            if (matchMode == "any")
-                query = query.Where(n => terms.Any(term =>
-                    ((searchScope == "all" || searchScope == "title") && n.Title.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "details") && n.Details != null && n.Details.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "conclusion") && n.Conclusion != null && n.Conclusion.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "summary") && n.Summary != null && n.Summary.Contains(term)) ||
-                    (searchScope == "all" && n.Category != null && n.Category.Contains(term))));
-            else foreach (var term in terms)
-                query = query.Where(n =>
-                    ((searchScope == "all" || searchScope == "title") && n.Title.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "details") && n.Details != null && n.Details.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "conclusion") && n.Conclusion != null && n.Conclusion.Contains(term)) ||
-                    ((searchScope == "all" || searchScope == "summary") && n.Summary != null && n.Summary.Contains(term)) ||
-                    (searchScope == "all" && n.Category != null && n.Category.Contains(term)));
-        }
+        query = ApplyTextSearch(query, terms);
         resultCount = await query.CountAsync();
         query = sortOrder switch
         {
@@ -155,7 +147,10 @@ public partial class PersonalNotes
             _ => query.OrderByDescending(n => n.NoteDate).ThenByDescending(n => n.UpdatedAtUtc).ThenByDescending(n => n.Id)
         };
         notes = await query.Take(resultLimit).ToListAsync();
-        categories = await db.PersonalNotes.Where(n => n.Category != null).Select(n => n.Category!).Distinct().OrderBy(c => c).ToListAsync();
+        groups = await db.NoteGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
+        groupCounts = await db.PersonalNotes.Where(n => n.NoteGroupId != null).GroupBy(n => n.NoteGroupId!.Value).Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Id, g => g.Count);
+        categories = await db.PersonalNotes.Where(n => n.NoteGroupId == null && n.Category != null).Select(n => n.Category!)
+            .Union(db.NoteGroups.Where(g => g.Category != null).Select(g => g.Category!)).OrderBy(c => c).ToListAsync();
     }
 
     private Task SaveNote() => Run(async () =>
@@ -166,24 +161,34 @@ public partial class PersonalNotes
             return;
         }
         await using var db = await DbFactory.CreateDbContextAsync();
-        var note = selectedId is int id ? await db.PersonalNotes.FindAsync(id) : new PersonalNote();
+        if (ValidateResearch() is { } researchError) { error = researchError; return; }
+        NoteGroup? group = null;
+        if (form.NoteGroupId is int groupId)
+        {
+            group = await db.NoteGroups.FindAsync(groupId);
+            if (group is null) { error = "This group no longer exists. Choose another group or No group."; return; }
+        }
+        var note = selectedId is int id ? await db.PersonalNotes.Include(n => n.ResearchEntries).SingleOrDefaultAsync(n => n.Id == id) : new PersonalNote();
         if (note is null) { error = "This note no longer exists. Your writing is still here."; return; }
         note.Title = form.Title.Trim();
         note.Kind = form.Kind;
         note.NoteDate = form.NoteDate;
         var category = string.IsNullOrWhiteSpace(form.Category) ? null : form.Category.Trim();
-        note.Category = category is null ? null : await db.PersonalNotes.Where(n => n.Category == category).Select(n => n.Category).FirstOrDefaultAsync() ?? category;
+        note.NoteGroupId = group?.Id;
+        note.Category = group is not null ? group.Category : category is null ? null : await db.PersonalNotes.Where(n => n.Category == category).Select(n => n.Category).FirstOrDefaultAsync() ?? category;
         // Preserve the user's paragraphs and Unicode text exactly as written.
         note.Details = form.Details;
         note.Conclusion = form.Conclusion;
         note.Summary = form.Summary;
         note.UpdatedAtUtc = DateTime.UtcNow;
+        UpdateResearch(db, note);
         if (selectedId is null) db.PersonalNotes.Add(note);
         await db.SaveChangesAsync();
         selectedId = note.Id;
         form.Category = note.Category;
         form.CreatedAtUtc = note.CreatedAtUtc;
         form.UpdatedAtUtc = note.UpdatedAtUtc;
+        form.ResearchEntries = note.ResearchEntries.Where(e => db.Entry(e).State != EntityState.Detached && db.Entry(e).State != EntityState.Deleted).OrderBy(e => e.Position).Select(e => new NoteResearch { Id = e.Id, SourceKind = e.SourceKind, SourceName = e.SourceName, SourceUrl = e.SourceUrl, Content = e.Content, Position = e.Position }).ToList();
         dirty = false;
         pendingAction = null;
         await RefreshResults();

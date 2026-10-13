@@ -120,6 +120,23 @@ footer span { color: #bad182; margin: 0 8px; }
 .note-sections > summary span { color: #8b968c; }
 .note-sections .field + .field { margin-top: 20px; }
 .note-fieldset { padding: 0; margin: 0; min-width: 0; border: 0; }
+.note-group-editor { margin-top: 18px; padding: 20px; background: #1a201c; border: 1px solid #3e473f; border-radius: 5px; }
+.note-groups { margin-bottom: 20px; }
+.note-groups > summary { color: #c5df8b; cursor: pointer; font-size: 12px; margin-bottom: 10px; }
+.note-group-row { display: flex; align-items: center; border: 1px solid transparent; border-radius: 4px; }
+.note-group-row.selected { background: #212b22; border-color: #3b5039; }
+.note-group-open { flex: 1; min-width: 0; display: grid; gap: 4px; padding: 10px; text-align: left; background: none; border: 0; color: inherit; }
+.note-group-open strong { font-size: 13px; overflow-wrap: anywhere; }
+.note-group-open small { color: #8b968c; font-size: 11px; }
+.notes-group-filter { margin-bottom: 14px; }
+.note-group-context { margin-bottom: 18px; padding: 12px 14px; background: #1b211c; border-left: 3px solid #667a4e; }
+.note-group-context strong { font-size: 13px; }
+.note-group-context p { font-size: 12px; color: #a8afa6; white-space: pre-wrap; margin: 8px 0; }
+.note-group-context .text-button { display: block; margin-top: 6px; }
+.research-entry { padding: 16px; margin: 12px 0; border: 1px solid #3e473f; border-radius: 4px; background: #1b211c; }
+.research-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; font-size: 12px; }
+.research-source-link { display: inline-block; margin-top: 6px; text-decoration: none; }
+.research-entry .form-grid > .field { margin-top: 0; }
 .note-save-state, .note-metadata { font-size: 11px; color: #8b968c; }
 .note-metadata { margin-top: 20px; }
 .notes-unsaved { background: #3b3524; color: #f3dfab; flex-wrap: wrap; align-items: center; }

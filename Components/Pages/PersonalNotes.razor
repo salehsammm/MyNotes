@@ -4,9 +4,10 @@
 @using Microsoft.AspNetCore.Components.Routing
 @inject Microsoft.EntityFrameworkCore.IDbContextFactory<MediaDbContext> DbFactory
 @inject IJSRuntime JS
+@inject Microsoft.Extensions.Logging.ILogger<PersonalNotes> Logger
 
 <PageTitle>Personal notes · Frame Notes</PageTitle>
-<NavigationLock ConfirmExternalNavigation="@dirty" OnBeforeInternalNavigation="BeforeNavigation" />
+<NavigationLock ConfirmExternalNavigation="@(dirty || groupDirty)" OnBeforeInternalNavigation="BeforeNavigation" />
 
 <div class="shell">
     <header class="topbar">
@@ -17,7 +18,30 @@
         <nav class="journal-actions journal-toolbar" aria-label="Personal notes actions">
             <button class="button primary" @onclick="() => RequestNew(PersonalNoteKind.Note)" disabled="@busy">+ New note</button>
             <button class="button ghost" @onclick="() => RequestNew(PersonalNoteKind.Diary)" disabled="@busy">+ Today's diary</button>
+            <button class="button ghost" @onclick="() => EditGroup(null)" disabled="@busy">+ New group</button>
         </nav>
+        @if (showGroupEditor)
+        {
+            <section class="note-group-editor" aria-label="Group editor">
+                <div class="section-heading"><h2>@(groupForm.Id == 0 ? "Create a note group" : "Edit note group")</h2></div>
+                <EditForm Model="groupForm" OnValidSubmit="SaveGroup" FormName="note-group">
+                    <DataAnnotationsValidator />
+                    <fieldset class="note-fieldset" disabled="@busy">
+                        <div class="form-grid">
+                            <div class="field"><label for="group-name">Group name</label><InputText id="group-name" @bind-Value="groupForm.Name" @oninput="MarkGroupDirty" placeholder="e.g. Limitless Book" dir="auto" /><ValidationMessage For="() => groupForm.Name" /></div>
+                            <div class="field"><label for="group-category">Group category <span>optional</span></label><InputText id="group-category" @bind-Value="groupForm.Category" @oninput="MarkGroupDirty" list="group-categories" placeholder="e.g. Life" dir="auto" /><ValidationMessage For="() => groupForm.Category" /><datalist id="group-categories">@foreach (var category in categories) { <option value="@category" /> }</datalist></div>
+                            <div class="field wide"><label for="group-description">Group description <span>optional</span></label><InputTextArea id="group-description" @bind-Value="groupForm.Description" @oninput="MarkGroupDirty" rows="2" dir="auto" /></div>
+                        </div>
+                        <div class="form-actions"><button class="button primary" type="submit">Save group</button><button class="button ghost" type="button" @onclick="CancelGroup">Cancel group edit</button></div>
+                        @if (groupForm.Id > 0)
+                        {
+                            @if (confirmGroupDelete) { <div class="delete-area"><span>Delete this empty group?</span><button class="danger-link" type="button" @onclick="DeleteGroup">Yes, delete group</button><button type="button" class="text-button" @onclick="() => confirmGroupDelete = false">Keep group</button></div> }
+                            else { <button type="button" class="danger-link" @onclick="() => confirmGroupDelete = true">Delete empty group</button> }
+                        }
+                    </fieldset>
+                </EditForm>
+            </section>
+        }
         @if (error is not null) { <div class="notice error" role="alert">@error <button @onclick="() => error = null">×</button></div> }
         @if (message is not null) { <div class="notice success" role="status">@message <button @onclick="() => message = null">×</button></div> }
         @if (pendingAction is not null)
@@ -27,9 +51,23 @@
         <div class="workspace notes-workspace">
             <aside class="library">
                 <div class="section-heading"><h2>Personal notes <span>@resultCount</span></h2></div>
+                @if (groups.Count > 0)
+                {
+                    <details class="note-groups" open>
+                        <summary>Groups <span>@groups.Count</span></summary>
+                        @foreach (var group in groups)
+                        {
+                            <div class="note-group-row @(groupFilter == group.Id ? "selected" : "")">
+                                <button type="button" class="note-group-open" @onclick="() => OpenGroup(group.Id)" disabled="@busy" aria-label="@($"Open group {group.Name}")"><strong dir="auto">@group.Name</strong><small>@(group.Category ?? "Uncategorized") · @GroupCount(group.Id) topics</small></button>
+                                <button type="button" class="text-button" @onclick="() => EditGroup(group.Id)" disabled="@busy" aria-label="@($"Edit group {group.Name}")">Edit</button>
+                            </div>
+                        }
+                    </details>
+                }
                 <form @onsubmit="Search" @onsubmit:preventDefault class="notes-search">
                     <label for="note-search">Words or phrase</label>
                     <input id="note-search" class="search" @bind="searchText" @bind:event="oninput" placeholder="Search all note sections…" />
+                    <div class="field notes-group-filter"><label for="note-group-filter">Search group</label><select id="note-group-filter" @bind="groupFilter" @bind:after="Search"><option value="0">All groups and notes</option><option value="-1">Ungrouped notes</option>@foreach (var group in groups) { <option value="@group.Id">@group.Name</option> }</select></div>
                     <div class="filter-row" aria-label="Note type filter">
                         @foreach (var choice in new[] { "All", "Notes", "Diary" })
                         {
@@ -40,7 +78,7 @@
                         <summary>Search options</summary>
                         <div class="form-grid">
                             <div class="field wide"><label for="note-match">Match</label><select id="note-match" @bind="matchMode"><option value="all">All words</option><option value="any">Any word</option><option value="phrase">Exact phrase</option></select></div>
-                            <div class="field wide"><label for="note-scope">Search in</label><select id="note-scope" @bind="searchScope"><option value="all">All sections</option><option value="title">Title</option><option value="details">Details / diary entry</option><option value="conclusion">Understanding &amp; conclusion</option><option value="summary">Summary</option></select></div>
+                            <div class="field wide"><label for="note-scope">Search in</label><select id="note-scope" @bind="searchScope"><option value="all">All sections</option><option value="title">Title</option><option value="details">Details / diary entry</option><option value="conclusion">Understanding &amp; conclusion</option><option value="summary">Summary</option><option value="research">Research &amp; sources</option></select></div>
                             <div class="field wide"><label for="note-category-filter">Category</label><select id="note-category-filter" @bind="categoryFilter"><option value="">All categories</option><option value="__none">Uncategorized</option>@foreach (var category in categories) { <option value="@category">@category</option> }</select></div>
                             <div class="field"><label for="note-from">From date</label><input id="note-from" type="date" @bind="fromDate" /></div>
                             <div class="field"><label for="note-to">To date</label><input id="note-to" type="date" @bind="toDate" /></div>
@@ -54,7 +92,7 @@
                     {
                         <button class="library-item @(selectedId == note.Id ? "selected" : "")" @onclick="() => RequestSelect(note.Id)" disabled="@busy" @key="note.Id">
                             <span class="item-icon">@(note.Kind == PersonalNoteKind.Diary ? "◷" : "▤")</span>
-                            <span class="item-main"><strong>@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(note.Category ?? "Uncategorized")</small><span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
+                            <span class="item-main"><strong>@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(EffectiveCategory(note) ?? "Uncategorized")</small>@if (note.NoteGroup is not null) { <small>@note.NoteGroup.Name</small> }<span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
                         </button>
                     }
                     @if (!busy && notes.Count == 0) { <p class="empty-list">No notes found. Write a note or start today's diary above.</p> }
@@ -62,6 +100,10 @@
                 @if (notes.Count < resultCount) { <button class="text-button" @onclick="LoadMore" disabled="@busy">Show more (@(resultCount - notes.Count) remaining)</button> }
             </aside>
             <section class="editor">
+                @if (form.NoteGroupId is int currentGroupId && groups.FirstOrDefault(g => g.Id == currentGroupId) is { } currentGroup)
+                {
+                    <div class="note-group-context"><strong dir="auto">@(currentGroup.Category ?? "Uncategorized") / @currentGroup.Name</strong>@if (!string.IsNullOrWhiteSpace(currentGroup.Description)) { <p dir="auto">@currentGroup.Description</p> }<button type="button" class="text-button" @onclick="() => RequestTopic(currentGroup.Id)" disabled="@busy">+ New topic in this group</button></div>
+                }
                 <div class="section-heading"><h2>@(selectedId is null ? (form.Kind == PersonalNoteKind.Diary ? "New diary entry" : "New note") : (form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Your note"))</h2><span class="note-save-state" role="status">@(dirty ? "Unsaved changes" : selectedId is not null ? "Saved" : "")</span></div>
                 <EditForm EditContext="editContext" OnValidSubmit="SaveNote" FormName="personal-note">
                     <DataAnnotationsValidator />
@@ -70,12 +112,31 @@
                             <div class="field wide"><label for="note-title">Title</label><InputText id="note-title" @bind-Value="form.Title" @oninput="MarkDirty" dir="auto" /><ValidationMessage For="() => form.Title" /></div>
                             <div class="field"><label for="note-kind">Type</label><InputSelect id="note-kind" @bind-Value="form.Kind"><option value="Note">Note</option><option value="Diary">Diary</option></InputSelect></div>
                             <div class="field"><label for="note-date">@(form.Kind == PersonalNoteKind.Diary ? "Diary date" : "Note date")</label><InputDate id="note-date" @bind-Value="form.NoteDate" /><ValidationMessage For="() => form.NoteDate" /></div>
-                            <div class="field wide"><label for="note-category">Category <span>optional · choose or type your own</span></label><InputText id="note-category" @bind-Value="form.Category" @oninput="MarkDirty" list="note-categories" placeholder="e.g. Food, Life" dir="auto" /><ValidationMessage For="() => form.Category" /><datalist id="note-categories">@foreach (var category in categories) { <option value="@category" /> }</datalist></div>
+                            <div class="field wide"><label for="note-group">Note group <span>optional</span></label><InputSelect id="note-group" @bind-Value="form.NoteGroupId" @bind-Value:after="GroupChanged"><option value="">No group</option>@foreach (var group in groups) { <option value="@group.Id">@group.Name</option> }</InputSelect></div>
+                            <div class="field wide"><label for="note-category">Category <span>@(form.NoteGroupId is not null ? "from group" : "optional · choose or type your own")</span></label><InputText id="note-category" @bind-Value="form.Category" @oninput="MarkDirty" disabled="@(form.NoteGroupId is not null)" list="note-categories" placeholder="e.g. Food, Life" dir="auto" /><ValidationMessage For="() => form.Category" /><datalist id="note-categories">@foreach (var category in categories) { <option value="@category" /> }</datalist></div>
                             <div class="field wide"><label for="note-details">@(form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Details") <span>optional · write freely</span></label><InputTextArea id="note-details" @bind-Value="form.Details" @oninput="MarkDirty" rows="10" dir="auto" /></div>
                             <details class="field wide note-sections" open="@(form.Kind == PersonalNoteKind.Note || !string.IsNullOrWhiteSpace(form.Conclusion) || !string.IsNullOrWhiteSpace(form.Summary))">
                                 <summary>Understanding, conclusion &amp; summary <span>optional</span></summary>
                                 <div class="field"><label for="note-conclusion">My understanding &amp; conclusion</label><InputTextArea id="note-conclusion" @bind-Value="form.Conclusion" @oninput="MarkDirty" rows="5" dir="auto" /></div>
                                 <div class="field"><label for="note-summary">Summary</label><InputTextArea id="note-summary" @bind-Value="form.Summary" @oninput="MarkDirty" rows="3" dir="auto" /></div>
+                            </details>
+                            <details class="field wide note-sections research-section" open="@(form.ResearchEntries.Count > 0)">
+                                <summary>Research &amp; sources <span>@form.ResearchEntries.Count entries · optional</span></summary>
+                                @for (var index = 0; index < form.ResearchEntries.Count; index++)
+                                {
+                                    var entry = form.ResearchEntries[index];
+                                    var number = index + 1;
+                                    <div class="research-entry" @key="entry">
+                                        <div class="research-heading"><strong>Research @number</strong><button type="button" class="danger-link" @onclick="() => RemoveResearch(entry)" aria-label="@($"Remove research {number}")">Remove</button></div>
+                                        <div class="form-grid">
+                                            <div class="field"><label for="@($"research-kind-{number}")">Source type @number</label><InputSelect id="@($"research-kind-{number}")" @bind-Value="entry.SourceKind"><option value="Website">Website</option><option value="AI">AI</option><option value="Other">Other</option></InputSelect></div>
+                                            <div class="field"><label for="@($"research-name-{number}")">Source name @number <span>optional</span></label><InputText id="@($"research-name-{number}")" @bind-Value="entry.SourceName" @oninput="MarkDirty" placeholder="e.g. ChatGPT or article title" dir="auto" /></div>
+                                            <div class="field wide"><label for="@($"research-url-{number}")">Source link @number <span>optional</span></label><InputText id="@($"research-url-{number}")" @bind-Value="entry.SourceUrl" @oninput="MarkDirty" placeholder="https://…" />@if (SafeSourceUrl(entry.SourceUrl) is { } sourceUrl) { <a class="text-button research-source-link" href="@sourceUrl" target="_blank" rel="noopener noreferrer">Open source ↗</a> }</div>
+                                            <div class="field wide"><label for="@($"research-content-{number}")">Research notes @number</label><InputTextArea id="@($"research-content-{number}")" @bind-Value="entry.Content" @oninput="MarkDirty" rows="4" dir="auto" /></div>
+                                        </div>
+                                    </div>
+                                }
+                                <button type="button" class="text-button" @onclick="AddResearch">+ Add research entry</button>
                             </details>
                         </div>
                         <div class="form-actions"><button type="submit" class="button primary">Save @(form.Kind == PersonalNoteKind.Diary ? "diary entry" : "note")</button></div>
