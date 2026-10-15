@@ -213,11 +213,11 @@ namespace MovieReviews.Migrations
                     b.Property<string>("AssQuality")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("BellyQuality")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int?>("AssSizeId")
                         .HasColumnType("int");
+
+                    b.Property<string>("BellyQuality")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("BjQuality")
                         .HasColumnType("nvarchar(max)");
@@ -350,11 +350,11 @@ namespace MovieReviews.Migrations
                     b.Property<string>("AlternateUrls")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("CoverUrl")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("IsDraft")
                         .HasColumnType("bit");
@@ -383,30 +383,6 @@ namespace MovieReviews.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RaindropId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceArchive")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceData")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("SourceCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SourceExcerpt")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool?>("SourceFavorite")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SourceHighlights")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceNote")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceTitle")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("ResumeAtSeconds")
@@ -438,6 +414,30 @@ namespace MovieReviews.Migrations
 
                     b.Property<int?>("SexRating")
                         .HasColumnType("int");
+
+                    b.Property<string>("SourceArchive")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SourceCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SourceData")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceExcerpt")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("SourceFavorite")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SourceHighlights")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceTitle")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Studio")
                         .HasColumnType("nvarchar(max)");
@@ -477,6 +477,12 @@ namespace MovieReviews.Migrations
                     b.Property<string>("BoobsOverride")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("Goddess")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("KindaPerfect")
+                        .HasColumnType("bit");
+
                     b.Property<string>("MoansOverride")
                         .HasColumnType("nvarchar(max)");
 
@@ -491,6 +497,9 @@ namespace MovieReviews.Migrations
 
                     b.Property<string>("SkinOverride")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("TooGreat")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 

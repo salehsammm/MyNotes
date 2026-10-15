@@ -422,9 +422,14 @@ else
             }
             if (!string.IsNullOrWhiteSpace(scene.SexNotes)) draft.Append("\nSex: ").Append(scene.SexNotes.Trim()).Append('\n');
             if (!string.IsNullOrWhiteSpace(scene.Verdict)) draft.Append("\nVerdict: ").Append(scene.Verdict.Trim()).Append('\n');
-            if (scene.Positions.Count > 0) draft.Append("Positions: ").Append(string.Join(", ", scene.Positions)).Append('\n');
+            if (scene.Positions.Count > 0) draft.Append("Positions: ").Append(string.Join(", ", ExportPositions(scene.Positions))).Append('\n');
             if (scene.Locations.Count > 0) draft.Append("Locations: ").Append(string.Join(", ", scene.Locations)).Append('\n');
             if (!string.IsNullOrWhiteSpace(scene.Tags)) draft.Append("Tags: ").Append(scene.Tags.Trim()).Append('\n');
+            foreach (var sp in scene.Performers)
+            {
+                var performer = allPerformers.FirstOrDefault(p => p.Id == sp.PerformerId);
+                if (performer is not null) draft.Append('\n').Append(BuildPerformerBlock(performer, sp)).Append('\n');
+            }
             return draft.ToString();
         }
 
@@ -435,7 +440,7 @@ else
         var rating = RatingLabel(scene.OverallRating, scene.OverallModifier);
         var povPart = scene.IsPov ? "POV -- " : "";
         var verdict = scene.Verdict ?? "";
-        sb.Append(rating).Append(" -- ").Append(povPart).Append(verdict).Append(",\n");
+        sb.Append(rating).Append(" -- ").Append(povPart).Append(verdict).Append(",\n\n");
 
         var setupRating = RatingLabel(scene.SetupRating, scene.SetupModifier);
         var setupNotes = scene.SetupNotes ?? "";
@@ -450,7 +455,7 @@ else
         if (scene.Locations.Count > 0)
             sexParts.AddRange(scene.Locations.Select(l => l.ToString()));
         if (scene.Positions.Count > 0)
-            sexParts.AddRange(scene.Positions.Select(p => p.ToString()));
+            sexParts.AddRange(ExportPositions(scene.Positions));
         sb.Append("Sex: ").Append(string.Join(", ", sexParts)).Append(",\n");
 
         if (!string.IsNullOrWhiteSpace(scene.SexNotes))
@@ -470,6 +475,22 @@ else
         sb.Append("\n\n\n");
 
         return sb.ToString();
+    }
+
+    private static IEnumerable<string> ExportPositions(List<Position> positions)
+    {
+        // A legacy Reverse-only selection also represents reverse cowgirl.
+        var hasReverse = positions.Contains(Position.Reverse);
+        foreach (var position in positions.Distinct())
+        {
+            if (position == Position.Reverse)
+            {
+                if (!positions.Contains(Position.Cowgirl)) yield return "cowgirl and R";
+            }
+            else if (position == Position.Cowgirl)
+                yield return hasReverse ? "cowgirl and R" : "cowgirl";
+            else yield return position.ToString();
+        }
     }
 
     private static List<string> SetupFlags(Scene scene)
@@ -495,6 +516,15 @@ else
             nameLine += " " + string.Join(" ", parts);
         nameLine += ",";
         lines.Add(nameLine);
+
+        if (sp.KindaPerfect) lines.Add("kinda perfect,");
+        if (sp.TooGreat) lines.Add("too great,");
+        if (sp.Goddess) lines.Add("goddess,");
+        if (p.AgeCategory == PerformerAgeCategory.Milf) lines.Add("MILF,");
+        if (!string.IsNullOrWhiteSpace(p.FaceQuality)) lines.Add(p.FaceQuality.Trim() + " face,");
+        var body = string.Join(" ", new[] { p.BodySize?.Trim(), p.BodyQuality?.Trim() }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+        if (body.Length > 0) lines.Add(body + " body,");
 
         var skin = FormatSkin(p, sp.SkinOverride);
         if (skin is not null) lines.Add(skin);

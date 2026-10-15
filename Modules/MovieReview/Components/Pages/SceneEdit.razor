@@ -205,6 +205,7 @@ else
                     {
                         <div class="form-check form-check-inline">
                             <input type="checkbox" class="form-check-input"
+                                   disabled="@(pos == Position.Reverse && !_scene.Positions.Contains(Position.Cowgirl))"
                                    checked="@_scene.Positions.Contains(pos)"
                                    @onchange="e => TogglePosition(pos, (bool)e.Value!)" />
                             <label class="form-check-label">@pos</label>
@@ -283,6 +284,21 @@ else
                             </div>
                         </div>
                         <div class="row">
+                            <fieldset class="col-12 mb-2">
+                                <legend class="fs-6 mb-1">Badges for this scene only</legend>
+                                <div class="form-check form-check-inline">
+                                    <InputCheckbox id="@($"kindaPerfect-{pid}")" @bind-Value="sp.KindaPerfect" class="form-check-input" />
+                                    <label for="@($"kindaPerfect-{pid}")" class="form-check-label">Kinda perfect</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <InputCheckbox id="@($"tooGreat-{pid}")" @bind-Value="sp.TooGreat" class="form-check-input" />
+                                    <label for="@($"tooGreat-{pid}")" class="form-check-label">Too great</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <InputCheckbox id="@($"goddess-{pid}")" @bind-Value="sp.Goddess" class="form-check-input" />
+                                    <label for="@($"goddess-{pid}")" class="form-check-label">Goddess</label>
+                                </div>
+                            </fieldset>
                             <div class="col-md-6 mb-1">
                                 <label>Skin override</label>
                                 <InputText @bind-Value="sp.SkinOverride"
@@ -604,6 +620,9 @@ else
             _assSizes = await assTask;
             _bjTags = await bjTask;
             _scene = await sceneTask;
+            // Older reviews could store Reverse on its own; keep that selection usable.
+            if (_scene?.Positions.Contains(Position.Reverse) == true && !_scene.Positions.Contains(Position.Cowgirl))
+                _scene.Positions.Add(Position.Cowgirl);
             if (!string.IsNullOrWhiteSpace(_scene?.Studio) && !_studios.Any(s => string.Equals(s.Name, _scene.Studio, StringComparison.OrdinalIgnoreCase)))
                 _studios.Add(new Studio { Name = _scene.Studio });
             RefreshAvailable();
@@ -741,8 +760,10 @@ else
     private void TogglePosition(Position pos, bool on)
     {
         if (_scene is null || IsBusy) return;
+        if (pos == Position.Reverse && on && !_scene.Positions.Contains(Position.Cowgirl)) return;
         if (on && !_scene.Positions.Contains(pos)) _scene.Positions.Add(pos);
         else if (!on) _scene.Positions.Remove(pos);
+        if (pos == Position.Cowgirl && !on) _scene.Positions.Remove(Position.Reverse);
     }
 
     private void ToggleLocation(Location loc, bool on)

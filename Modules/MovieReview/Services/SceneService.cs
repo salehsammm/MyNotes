@@ -46,6 +46,9 @@ public class SceneService
 			AssOverride = sp.AssOverride,
 			BjOverride = sp.BjOverride,
 			MoansOverride = sp.MoansOverride,
+			KindaPerfect = sp.KindaPerfect,
+			TooGreat = sp.TooGreat,
+			Goddess = sp.Goddess,
 			Notes = sp.Notes
 		}).ToList();
 
@@ -111,6 +114,9 @@ public class SceneService
 				AssOverride = sp.AssOverride,
 				BjOverride = sp.BjOverride,
 				MoansOverride = sp.MoansOverride,
+				KindaPerfect = sp.KindaPerfect,
+				TooGreat = sp.TooGreat,
+				Goddess = sp.Goddess,
 				Notes = sp.Notes
 			});
 		}

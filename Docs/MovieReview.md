@@ -43,9 +43,11 @@ Run an import in a transaction and make it safe to rerun. Afterward, reconcile s
 
 ## Review export editing
 
-After completing a review, the export page lets you edit the generated notepad text directly before copying it. These edits apply to the current copy only; use **Edit scene** to persist changes to the review fields. Text exports omit the scene URL and performer age and language flags. Setup ratings appear before setup flags and notes, and performer moans descriptions include the moans label (including override-only descriptions).
+After completing a review, the export page lets you edit the generated notepad text directly before copying it. These edits apply to the current copy only; use **Edit scene** to persist changes to the review fields. Text exports omit the scene URL and performer age and language flags, except **MILF**, which is included when selected. Setup ratings appear before setup flags and notes, with a blank line separating the opening summary from Setup. Performer blocks include face quality, body size/quality, and moans descriptions with the moans label (including override-only descriptions). Draft exports also include performer blocks.
 
 In the scene editor, **New performer** prefills the name from the current performer search text.
+
+Performer override cards offer independent **Kinda perfect**, **Too great**, and **Goddess** checkboxes. These badges belong to the scene-performer link, persist with that review, and appear in its text export; they never change the performer profile. Reverse can only be selected while Cowgirl is checked; unchecking Cowgirl clears Reverse. Their combined export label is `cowgirl and R`. Older Reverse-only reviews are shown with Cowgirl selected when opened for editing and use the combined export label.
 
 ## Code map
 
@@ -66,6 +68,8 @@ Use `/moviereview/...` for links and `NavigationManager.NavigateTo` targets. Eve
 Ctrl+S and Esc handlers are registered by editors and disposed on departure; the script is loaded by the host App component. Module styles are loaded by the module layout. Do not add a second Blazor App component, router, or host Program.cs.
 
 Schema changes use `--context MovieReviews.Data.AppDbContext --output-dir Modules/MovieReview/Migrations`. Connection configuration is `ConnectionStrings:MovieReview`. Update this guide when features or schema change. Verify CRUD on the affected page and that the preserved migration history is used; never recreate the existing database.
+
+EF tooling uses `DesignTimeAppDbContextFactory` to read the same connection configuration outside a Blazor session. Runtime database access continues to use the private session gate. Check generated snapshot paths carefully: the combined host has two contexts named `AppDbContext`, and the MovieReview snapshot belongs under `Modules/MovieReview/Migrations`.
 
 ## Password protection
 

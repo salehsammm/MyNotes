@@ -18,4 +18,9 @@ public class ScenePerformer
 	public string? MoansOverride { get; set; }
 
 	public string? Notes { get; set; }
+
+	// Recognition for this scene only, never part of the performer profile.
+	public bool KindaPerfect { get; set; }
+	public bool TooGreat { get; set; }
+	public bool Goddess { get; set; }
 }
