@@ -51,7 +51,7 @@ else
     }
     @if (_copyError is not null) { <div class="alert alert-danger" role="alert">@_copyError</div> }
     <div class="detail-grid">
-        <section class="detail-card"><div class="d-flex justify-content-between align-items-center mb-3"><div class="detail-section-title mb-0">EXPORT / NOTEPAD ENTRY</div><button type="button" class="btn btn-primary" @onclick="CopyExport">@(_copied ? "Copied!" : "Copy export")</button></div><pre class="notepad-entry">@_notepad</pre></section>
+        <section class="detail-card"><div class="d-flex justify-content-between align-items-center mb-3"><label for="exportNote" class="detail-section-title mb-0">EXPORT / NOTEPAD ENTRY</label><button type="button" class="btn btn-primary" @onclick="CopyExport">@(_copied ? "Copied!" : "Copy export")</button></div><textarea id="exportNote" class="form-control notepad-entry" rows="24" @bind="_notepad" @bind:event="oninput" @bind:after="ExportChanged"></textarea><small class="text-muted">Edit this text before copying. Export edits apply to this copy only; use Edit scene to save review changes.</small></section>
         <aside class="detail-side"><div class="detail-card"><div class="detail-section-title">AT A GLANCE</div><div class="detail-facts"><div><span>Overall</span><strong class="rating-badge @RatingClass(_scene.OverallRating)">@RatingText(_scene.OverallRating)</strong></div><div><span>Setup</span><strong class="rating-badge @RatingClass(_scene.SetupRating)">@RatingText(_scene.SetupRating)</strong></div><div><span>Sex</span><strong class="rating-badge @RatingClass(_scene.SexRating)">@RatingText(_scene.SexRating)</strong></div><div><span>POV</span><strong>@(_scene.IsPov ? "Yes" : "No")</strong></div></div></div>@if (!string.IsNullOrWhiteSpace(_scene.SourceExcerpt)) { <div class="detail-card"><div class="detail-section-title">SOURCE DESCRIPTION</div><p>@_scene.SourceExcerpt</p></div> }<div class="detail-card"><div class="detail-section-title">PERFORMERS</div><div class="tag-list">@foreach (var link in _scene.Performers) { <a class="mini-tag" href="/moviereview/performers/@link.PerformerId/view">@link.Performer.Name</a> }</div></div><div class="detail-card"><div class="detail-section-title">POSITIONS & LOCATIONS</div><div class="tag-list">@foreach (var p in _scene.Positions) { <span class="mini-tag">@p</span> } @foreach (var l in _scene.Locations) { <span class="mini-tag">@l</span> }</div></div>@if (!string.IsNullOrWhiteSpace(_scene.Tags)) { <div class="detail-card"><div class="detail-section-title">TAGS</div><div class="tag-list">@foreach (var tag in _scene.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <span class="mini-tag">@tag</span> }</div></div> }</aside>
     </div>
 }
@@ -63,6 +63,11 @@ else
     private bool _loading = true;
     private bool _copied;
     private string? _copyError;
+    private void ExportChanged()
+    {
+        _copied = false;
+        _copyError = null;
+    }
     private async Task CopyExport()
     {
         try
@@ -76,6 +81,8 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        _copied = false;
+        _copyError = null;
         _scene = await SceneService.GetAsync(Id);
         if (_scene is not null)
         {

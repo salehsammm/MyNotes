@@ -41,6 +41,12 @@ Assign `Studio` only from a clear publisher/series brand in the source title or 
 
 Run an import in a transaction and make it safe to rerun. Afterward, reconcile source row counts against rows represented in `SourceData`, check for repeated bookmark IDs and duplicate primary or alternate URLs, inspect ambiguous matches and placeholder titles, and confirm every newly identified file appears in the database. Record the new file names, row counts, scenes added or enriched, total scenes, and unresolved cases in this document. Never recreate the existing `MovieReviews` database to perform an import.
 
+## Review export editing
+
+After completing a review, the export page lets you edit the generated notepad text directly before copying it. These edits apply to the current copy only; use **Edit scene** to persist changes to the review fields. Text exports omit the scene URL and performer age and language flags. Setup ratings appear before setup flags and notes, and performer moans descriptions include the moans label (including override-only descriptions).
+
+In the scene editor, **New performer** prefills the name from the current performer search text.
+
 ## Code map
 
 - `Modules/MovieReview/MovieReviewModule.cs`: service registrations and context factory.

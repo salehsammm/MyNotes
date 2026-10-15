@@ -796,7 +796,7 @@ else
     private void OpenNewPerformer()
     {
         if (IsBusy) return;
-        _editingPerformer = new Performer();
+        _editingPerformer = new Performer { Name = _performerSearch.Trim() };
         _performerError = null;
         _addNewToScene = true;
         _showExtraModal = false;

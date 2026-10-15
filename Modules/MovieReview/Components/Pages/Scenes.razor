@@ -409,7 +409,6 @@ else
             draft.Append("Name: ").Append(scene.Title).Append('\n');
             if (scene.ResumeAtSeconds is int resume) draft.Append("Continue at: ").Append(PlaybackPosition.Format(resume)).Append('\n');
             if (!string.IsNullOrWhiteSpace(scene.Studio)) draft.Append("Studio: ").Append(scene.Studio).Append('\n');
-            if (!string.IsNullOrWhiteSpace(scene.Url)) draft.Append("URL: ").Append(scene.Url).Append('\n');
             if (scene.Performers.Count > 0)
                 draft.Append("Performers: ").Append(string.Join(", ", scene.Performers.Select(sp => allPerformers.FirstOrDefault(p => p.Id == sp.PerformerId)?.Name).Where(n => n is not null))).Append('\n');
             if (scene.OverallRating.HasValue) draft.Append("Overall: ").Append(RatingLabel(scene.OverallRating, scene.OverallModifier)).Append('\n');
@@ -432,7 +431,6 @@ else
         var sb = new StringBuilder();
 
         sb.Append("Name: ").Append(scene.Title).Append('\n');
-        if (!string.IsNullOrWhiteSpace(scene.Url)) sb.Append("URL: ").Append(scene.Url).Append('\n');
 
         var rating = RatingLabel(scene.OverallRating, scene.OverallModifier);
         var povPart = scene.IsPov ? "POV -- " : "";
@@ -441,9 +439,9 @@ else
 
         var setupRating = RatingLabel(scene.SetupRating, scene.SetupModifier);
         var setupNotes = scene.SetupNotes ?? "";
-        sb.Append("Setup: ");
+        sb.Append("Setup: ").Append(setupRating).Append(", ");
         foreach (var flag in SetupFlags(scene)) sb.Append(flag).Append(", ");
-        sb.Append(setupRating).Append(", ").Append(setupNotes).Append(",\n");
+        sb.Append(setupNotes).Append(",\n");
 
         sb.Append('\n');
 
@@ -497,9 +495,6 @@ else
             nameLine += " " + string.Join(" ", parts);
         nameLine += ",";
         lines.Add(nameLine);
-
-        if (p.AgeCategory is { } age) lines.Add(PerformerAgeCategories.Label(age) + ",");
-        if (p.DoesNotSpeakEnglish) lines.Add("speak no english,");
 
         var skin = FormatSkin(p, sp.SkinOverride);
         if (skin is not null) lines.Add(skin);
@@ -604,13 +599,14 @@ else
 
     private static string? FormatMoans(Performer p, string? ov)
     {
-        var moans = p.Moans;
+        var moans = p.Moans?.Trim();
         if (string.IsNullOrWhiteSpace(moans) && string.IsNullOrWhiteSpace(ov))
             return null;
 
-        if (!string.IsNullOrWhiteSpace(ov))
-            return $"({ov.Trim()}) {moans},";
-
-        return moans + ",";
+        var description = string.Join(" ", new[] { string.IsNullOrWhiteSpace(ov) ? null : $"({ov.Trim()})", moans }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+        if (!System.Text.RegularExpressions.Regex.IsMatch(description, @"\bmoans?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            description += " moans";
+        return description + ",";
     }
 }
