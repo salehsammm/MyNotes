@@ -1,0 +1,180 @@
+using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+if (args.Length < 3 || args[2] is not ("apply" or "verify" or "repair") || (args[2] == "repair" && args.Length != 4))
+    throw new ArgumentException("Expected manifest, IIS deployment directory, apply|verify");
+var manifestPath = Path.GetFullPath(args[0]);
+var archive = Path.GetDirectoryName(manifestPath)!;
+var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, WriteIndented = true };
+var manifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(manifestPath), jsonOptions)!;
+var previous = args[2] == "repair" ? JsonSerializer.Deserialize<Manifest>(File.ReadAllText(args[3]), jsonOptions) : null;
+if (previous is not null && !previous.Notes.Select(n => n.SourceHash).Order().SequenceEqual(manifest.Notes.Select(n => n.SourceHash).Order()))
+    throw new Exception("Repair must contain exactly the same source PDFs");
+if (manifest.Version != 1 || manifest.Notes.Count == 0) throw new Exception("Invalid manifest");
+string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+foreach (var note in manifest.Notes)
+{
+    if (Path.GetFileName(note.FileName) != note.FileName || note.Title.Length is < 1 or > 200 || note.Kind is not (1 or 2))
+        throw new Exception("Invalid note metadata");
+    if (Hash(File.ReadAllBytes(Path.Combine(archive, "originals", note.FileName))) != note.SourceHash ||
+        Hash(File.ReadAllBytes(Path.Combine(manifest.SourceFolder, note.FileName))) != note.SourceHash ||
+        Hash(Encoding.UTF8.GetBytes(note.Details)) != note.TextHash ||
+        string.Join("\n\n", note.Pages.Select(p => p.Text)) != note.Details)
+        throw new Exception("Source, archive, or extracted text integrity check failed");
+    _ = DateOnly.ParseExact(note.NoteDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+}
+if (manifest.Notes.Select(n => n.SourceHash).Distinct().Count() != manifest.Notes.Count)
+    throw new Exception("Duplicate source hashes");
+
+string? connectionString = null;
+foreach (var file in new[] { "appsettings.json", "appsettings.Production.json" })
+{
+    var path = Path.Combine(args[1], file);
+    if (!File.Exists(path)) continue;
+    using var settings = JsonDocument.Parse(File.ReadAllText(path));
+    if (settings.RootElement.TryGetProperty("ConnectionStrings", out var strings) &&
+        strings.TryGetProperty("MediaJournal", out var value)) connectionString = value.GetString();
+}
+if (string.IsNullOrWhiteSpace(connectionString)) throw new Exception("Missing IIS journal connection string");
+await using var db = new SqlConnection(connectionString);
+await db.OpenAsync();
+SqlCommand Command(string sql, SqlTransaction? transaction = null, params (string Key, object? Value)[] parameters)
+{
+    var command = new SqlCommand(sql, db, transaction) { CommandTimeout = 180 };
+    foreach (var (key, value) in parameters) command.Parameters.AddWithValue(key, value ?? DBNull.Value);
+    return command;
+}
+await using (var command = Command("DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource='MyNotes.SamsungNotesImport', @LockMode='Exclusive', @LockOwner='Session', @LockTimeout=0; SELECT @r;"))
+    if (Convert.ToInt32(await command.ExecuteScalarAsync()) < 0) throw new Exception("Another import is running");
+
+var tableNames = new[] { "MediaItems", "Episodes", "PersonalNotes", "NoteGroups", "NoteResearch", "MediaLists", "MediaListEntries" };
+async Task<Dictionary<string, Dictionary<int, string>>> Snapshot()
+{
+    var result = new Dictionary<string, Dictionary<int, string>>();
+    foreach (var table in tableNames)
+    {
+        await using var exists = Command("SELECT OBJECT_ID(@name, 'U')", null, ("@name", "dbo." + table));
+        if (await exists.ExecuteScalarAsync() is DBNull) continue;
+        await using var command = Command($"SELECT t.Id, (SELECT t.* FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER) FROM dbo.[{table}] t ORDER BY t.Id");
+        await using var reader = await command.ExecuteReaderAsync();
+        var rows = new Dictionary<int, string>();
+        while (await reader.ReadAsync()) rows.Add(reader.GetInt32(0), reader.GetString(1));
+        result.Add(table, rows);
+    }
+    return result;
+}
+
+var baselinePath = Path.Combine(archive, "database-before.json");
+var backupRecord = Path.Combine(archive, args[2] == "repair" ? "database-backup-before-repair.json" : "database-backup.json");
+if (args[2] is "apply" or "repair" && !File.Exists(backupRecord))
+{
+    if (args[2] == "apply" && File.Exists(baselinePath)) throw new Exception("Incomplete backup state; review before proceeding");
+    if (args[2] == "repair" && !File.Exists(baselinePath)) throw new Exception("Repair requires the original import baseline");
+    var baseline = await Snapshot();
+    File.WriteAllText(args[2] == "repair" ? Path.Combine(archive, "database-before-repair.json") : baselinePath, JsonSerializer.Serialize(baseline, jsonOptions));
+    await using var folderCommand = Command("SELECT CONVERT(nvarchar(4000), SERVERPROPERTY('InstanceDefaultBackupPath'))");
+    var backupFolder = (string?)await folderCommand.ExecuteScalarAsync();
+    if (string.IsNullOrWhiteSpace(backupFolder)) throw new Exception("SQL Server backup folder is unavailable");
+    var backupPath = Path.Combine(backupFolder, $"MyNotes-before-Samsung-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bak");
+    // COPY_ONLY leaves the existing backup chain intact; a unique file avoids overwriting a backup.
+    await using (var command = Command("DECLARE @sql nvarchar(max)=N'BACKUP DATABASE '+QUOTENAME(DB_NAME())+N' TO DISK=@p WITH COPY_ONLY, CHECKSUM'; EXEC sys.sp_executesql @sql,N'@p nvarchar(4000)',@p=@path;", null, ("@path", backupPath)))
+        await command.ExecuteNonQueryAsync();
+    await using (var command = Command("RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM", null, ("@path", backupPath)))
+        await command.ExecuteNonQueryAsync();
+    File.WriteAllText(backupRecord, JsonSerializer.Serialize(new { database = db.Database, backupPath, verified = true }, jsonOptions));
+    Console.WriteLine("Database backup created and verified; baseline rows saved outside the repository.");
+}
+var groupDescription = "Original Samsung Notes PDF imports. One note per PDF; wording and embedded dates retained. Note dates come from export filenames, not inferred diary dates.";
+string Metadata(Note note) => $"Original PDF: {note.FileName}\nSHA-256: {note.SourceHash}\nPages: {note.Pages.Count}\nArchived original: {Path.Combine(archive, "originals", note.FileName)}\nExport filename timestamp: {note.FilenameTimestamp}\nThe note date uses the export filename date; original dates remain in the text.\nText SHA-256: {note.TextHash}\nImported intact, without summarizing or splitting. Formatting remains in the archived PDF.";
+async Task<bool> Matches(Note note, int id, SqlTransaction transaction)
+{
+    await using var check = Command("SELECT n.Title,n.Kind,n.NoteDate,n.Details,n.Conclusion,n.Summary,g.Name,r.Content FROM dbo.PersonalNotes n JOIN dbo.NoteGroups g ON n.NoteGroupId=g.Id JOIN dbo.NoteResearch r ON r.PersonalNoteId=n.Id AND r.SourceName=@marker WHERE n.Id=@id", transaction, ("@id", id), ("@marker", "Samsung Notes PDF sha256:" + note.SourceHash));
+    await using var reader = await check.ExecuteReaderAsync();
+    return await reader.ReadAsync() && reader.GetString(0) == note.Title && reader.GetInt32(1) == note.Kind &&
+        DateOnly.FromDateTime(reader.GetDateTime(2)).ToString("yyyy-MM-dd") == note.NoteDate &&
+        reader.GetString(3) == note.Details && reader.IsDBNull(4) && reader.IsDBNull(5) &&
+        reader.GetString(6) == "Samsung Notes" && reader.GetString(7) == Metadata(note);
+}
+var imported = new List<object>();
+var added = 0;
+var repaired = 0;
+foreach (var note in manifest.Notes)
+{
+    var marker = "Samsung Notes PDF sha256:" + note.SourceHash;
+    var metadata = Metadata(note);
+    using var transaction = db.BeginTransaction(IsolationLevel.Serializable);
+    int? noteId = null;
+    await using (var find = Command("SELECT PersonalNoteId FROM dbo.NoteResearch WHERE SourceKind=3 AND SourceName=@marker", transaction, ("@marker", marker)))
+    {
+        await using var reader = await find.ExecuteReaderAsync();
+        if (await reader.ReadAsync()) noteId = reader.GetInt32(0);
+        if (await reader.ReadAsync()) throw new Exception("Duplicate import marker; review existing records");
+    }
+    var created = false;
+    if (noteId is null && args[2] == "apply")
+    {
+        int? groupId = null;
+        await using (var group = Command("SELECT Id,Description FROM dbo.NoteGroups WHERE Name=N'Samsung Notes'", transaction))
+        {
+            await using var reader = await group.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                groupId = reader.GetInt32(0);
+                if (reader.IsDBNull(1) || reader.GetString(1) != groupDescription) throw new Exception("Group name collision; existing group was left unchanged");
+            }
+            if (await reader.ReadAsync()) throw new Exception("Ambiguous import group");
+        }
+        if (groupId is null)
+        {
+            await using var group = Command("INSERT dbo.NoteGroups(Name,Category,Description,CreatedAtUtc) OUTPUT INSERTED.Id VALUES(N'Samsung Notes',N'Imported',@description,SYSUTCDATETIME())", transaction, ("@description", groupDescription));
+            groupId = Convert.ToInt32(await group.ExecuteScalarAsync());
+        }
+        await using (var insert = Command("INSERT dbo.PersonalNotes(Title,Kind,NoteDate,Category,Details,Conclusion,Summary,NoteGroupId,CreatedAtUtc,UpdatedAtUtc) OUTPUT INSERTED.Id VALUES(@title,@kind,@date,N'Imported',@details,NULL,NULL,@group,SYSUTCDATETIME(),SYSUTCDATETIME())", transaction,
+            ("@title", note.Title), ("@kind", note.Kind), ("@date", DateOnly.Parse(note.NoteDate).ToDateTime(TimeOnly.MinValue)), ("@details", note.Details), ("@group", groupId)))
+            noteId = Convert.ToInt32(await insert.ExecuteScalarAsync());
+        await using (var insert = Command("INSERT dbo.NoteResearch(PersonalNoteId,SourceKind,SourceName,SourceUrl,Content,Position) VALUES(@id,3,@marker,NULL,@metadata,0)", transaction,
+            ("@id", noteId), ("@marker", marker), ("@metadata", metadata))) await insert.ExecuteNonQueryAsync();
+        created = true;
+    }
+    if (noteId is null) throw new Exception("A source PDF has not been imported");
+    if (previous is not null && !await Matches(note, noteId.Value, transaction))
+    {
+        var old = previous.Notes.Single(n => n.SourceHash == note.SourceHash);
+        if (!await Matches(old, noteId.Value, transaction)) throw new Exception("Imported note was edited; refusing to overwrite it");
+        await using var repair = Command("UPDATE dbo.PersonalNotes SET Details=@details WHERE Id=@id; UPDATE dbo.NoteResearch SET Content=@metadata WHERE PersonalNoteId=@id AND SourceName=@marker;", transaction,
+            ("@details", note.Details), ("@metadata", metadata), ("@id", noteId), ("@marker", marker));
+        await repair.ExecuteNonQueryAsync();
+        repaired++;
+    }
+    if (!await Matches(note, noteId.Value, transaction)) throw new Exception("Stored note differs from prepared source; no existing note was overwritten");
+    transaction.Commit();
+    if (created) added++;
+    imported.Add(new { note.FileName, note.SourceHash, note.TextHash, noteId, pages = note.Pages.Count });
+    // Durable progress after each transaction. A retry finds the stored hash marker even if this write was interrupted.
+    File.WriteAllText(Path.Combine(archive, "import-progress.json"), JsonSerializer.Serialize(imported, jsonOptions));
+    Console.WriteLine($"{imported.Count:00}/{manifest.Notes.Count}: {(created ? "inserted" : "already present")}, note {noteId}; text verified.");
+}
+if (!File.Exists(baselinePath)) throw new Exception("Missing pre-import baseline");
+var before = JsonSerializer.Deserialize<Dictionary<string, Dictionary<int, string>>>(File.ReadAllText(baselinePath), jsonOptions)!;
+var after = await Snapshot();
+foreach (var (table, rows) in before)
+    foreach (var (id, original) in rows)
+        if (!after.TryGetValue(table, out var current) || !current.TryGetValue(id, out var value) || value != original)
+            throw new Exception("A pre-existing row changed during the import; review backup and concurrent edits");
+if (after["PersonalNotes"].Count != before["PersonalNotes"].Count + manifest.Notes.Count ||
+    after["NoteResearch"].Count != before["NoteResearch"].Count + manifest.Notes.Count ||
+    after["NoteGroups"].Count != before["NoteGroups"].Count + 1)
+    throw new Exception("Unexpected row totals; review before declaring completion");
+foreach (var table in tableNames.Except(new[] { "PersonalNotes", "NoteResearch", "NoteGroups" }))
+    if (before.TryGetValue(table, out var oldRows) && after[table].Count != oldRows.Count)
+        throw new Exception("Unrelated table count changed");
+File.WriteAllText(Path.Combine(archive, "verification.json"), JsonSerializer.Serialize(new { verifiedAtUtc = DateTime.UtcNow, notes = imported.Count, newlyAdded = added, repaired, pages = manifest.Notes.Sum(n => n.Pages.Count), existingRowsUnchanged = true, sourceHashesVerified = true, storedTextMatchesExactly = true }, jsonOptions));
+Console.WriteLine($"Verified {imported.Count} notes; {added} added; {repaired} extraction repairs; every pre-existing row unchanged.");
+
+record Manifest(int Version, string SourceFolder, List<Note> Notes);
+record Note(string FileName, string SourceHash, string Title, string NoteDate, string FilenameTimestamp, int Kind, string Details, string TextHash, List<Page> Pages);
+record Page(int Number, string Text, string RawVisualText);
