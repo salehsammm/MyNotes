@@ -49,6 +49,29 @@ In the scene editor, **New performer** prefills the name from the current perfor
 
 Performer override cards offer independent **Kinda perfect**, **Too great**, and **Goddess** checkboxes. These badges belong to the scene-performer link, persist with that review, and appear in its text export; they never change the performer profile. Reverse can only be selected while Cowgirl is checked; unchecking Cowgirl clears Reverse. Their combined export label is `cowgirl and R`. Older Reverse-only reviews are shown with Cowgirl selected when opened for editing and use the combined export label.
 
+## Archive collections and manual performer rankings
+
+`/moviereview/collections` is a private archive library, separate from scene reviews. On October 17, 2026, all 327 ZIP exports in `F:\Tala\1\z1\aaa\ForCodex2` were imported as 327 collections: 6,046 CSV bookmarks plus two extra text-file records. The complete original ZIP bytes are stored in `ArchiveCollections.OriginalArchive` with a SHA-256 fingerprint. This preserves CSV/HTML/URL exports, 14 PNG attachments, and extra text files independently of the source folder. Keep source files read-only and personal archive bytes out of Git and migration seeds.
+
+Each bookmark retains its title, exact URL, original note and all CSV fields in `SourceData`, including multiline whitespace. Notes, status, priority, saved progress, type and optional scene/performer links are independently editable. Explicit `page`/`p` query values were preserved on 217 bookmarks; folder names such as `Finished`, `Prio`, and `S_Tier` were retained without inventing parent folders, ratings or completion meaning. The 88 groups of repeated exact URLs remain separate source records. Type classification is conservative; uncertain entries remain Bookmark. Series entries remain archived as Series rather than being converted to episode reviews.
+
+Twenty-five bookmarks were linked to existing scenes by bookmark ID or normalized URL. No scenes or existing reviews were modified. `My_Gs.zip` contains 29 performer entries: 16 exact existing names were reused and 13 profiles were added using source labels as written. No alias merges were inferred (for example, `Myra` and `Myra Moans` remain distinct). Original descriptions are available through **Archived notes & links** rather than overwriting profile attributes.
+
+`/moviereview/performer-rankings` provides the owner's manual best-to-worst order. Set a position, move up/down, add to the standings or unrank. My Gs is the initial filter; all performers and all ranked performers are also available. Positions are global and remain unchanged by filters. All performers start unranked; archive ordering is not a preference ranking. Reorder operations run in serializable transactions and compact positions. Performer merges transfer archive links and preserve the surviving ranking; deletion compacts remaining positions.
+
+Archive and attachment downloads are under `/moviereview/collections/...`, require the private policy and a live session, and send `no-store`. Attachments are read from stored ZIP bytes by their recorded entry name, never served from public `wwwroot`. Only HTTP(S) source URLs are clickable. Locking or revoking a session protects pages, circuit database actions, and downloads.
+
+Local maintenance commands (run from the project folder):
+
+```powershell
+dotnet run --no-launch-profile -- --import-collections 'F:\Tala\1\z1\aaa\ForCodex2'
+dotnet run --no-launch-profile -- --link-my-gs
+```
+
+The importer migrates only MovieReview, uses a transaction for the batch, and skips archive hashes already present. Changed archive bytes create a separate collection version. It preserves each distinct bookmark row rather than deduplicating away the archive's data. The local My Gs linker is idempotent and does not set ranking positions. These commands use trusted local host database access; they do not relax the web session gate.
+
+The external audit at `F:\Tala\1\z1\aaa\ForCodex2-audit` contains inventory, fingerprints, source snapshots, reconciliation, import/test logs and a pre-import SQL backup. Verification compares every original ZIP byte and every CSV field, tests rerun safety and formatting with a disposable fixture, checks search/edit/pagination, validates manual ranking and profile merge/delete behavior, and checks live-session protection. `scripts/verify_collections.cs.template` is the reproducible service/import verification harness, intended for a disposable console project under `bin` referencing `MyNotes.csproj`. It restores test edits and removes its own database fixtures.
+
 ## Code map
 
 - `Modules/MovieReview/MovieReviewModule.cs`: service registrations and context factory.

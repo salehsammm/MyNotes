@@ -37,6 +37,112 @@ namespace MovieReviews.Migrations
                     b.ToTable("PerformerBjTags", (string)null);
                 });
 
+            modelBuilder.Entity("MovieReviews.Data.ArchiveCollection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ArchiveName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ImportedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("OriginalArchive")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sha256")
+                        .IsUnique();
+
+                    b.ToTable("ArchiveCollections");
+                });
+
+            modelBuilder.Entity("MovieReviews.Data.ArchiveItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArchiveCollectionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AttachmentName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("PerformerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Progress")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("SceneId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceData")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceNote")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SourceRow")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformerId");
+
+                    b.HasIndex("SceneId");
+
+                    b.HasIndex("ArchiveCollectionId", "SourceRow")
+                        .IsUnique();
+
+                    b.ToTable("ArchiveItems");
+                });
+
             modelBuilder.Entity("MovieReviews.Data.AssSize", b =>
                 {
                     b.Property<int>("Id")
@@ -265,6 +371,9 @@ namespace MovieReviews.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("RankingPosition")
+                        .HasColumnType("int");
+
                     b.Property<int?>("SkinColorId")
                         .HasColumnType("int");
 
@@ -276,7 +385,10 @@ namespace MovieReviews.Migrations
 
                     b.HasIndex("SkinColorId");
 
-                    b.ToTable("Performers");
+                    b.ToTable("Performers", t =>
+                        {
+                            t.HasCheckConstraint("CK_Performer_RankingPosition", "[RankingPosition] IS NULL OR [RankingPosition] > 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieReviews.Data.ResearchDoc", b =>
@@ -612,6 +724,31 @@ namespace MovieReviews.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MovieReviews.Data.ArchiveItem", b =>
+                {
+                    b.HasOne("MovieReviews.Data.ArchiveCollection", "Collection")
+                        .WithMany("Items")
+                        .HasForeignKey("ArchiveCollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MovieReviews.Data.Performer", "Performer")
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MovieReviews.Data.Scene", "Scene")
+                        .WithMany()
+                        .HasForeignKey("SceneId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Collection");
+
+                    b.Navigation("Performer");
+
+                    b.Navigation("Scene");
+                });
+
             modelBuilder.Entity("MovieReviews.Data.GuideItem", b =>
                 {
                     b.HasOne("MovieReviews.Data.GuideSection", "Section")
@@ -690,6 +827,11 @@ namespace MovieReviews.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("MovieReviews.Data.ArchiveCollection", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("MovieReviews.Data.AssSize", b =>

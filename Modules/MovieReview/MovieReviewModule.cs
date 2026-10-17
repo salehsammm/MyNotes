@@ -19,6 +19,8 @@ public static class MovieReviewModule
         services.AddScoped<NoteService>();
         services.AddScoped<ResearchService>();
         services.AddScoped<TrophyService>();
+        services.AddScoped<CollectionService>();
+        services.AddScoped<PerformerRankingService>();
         return services;
     }
 }

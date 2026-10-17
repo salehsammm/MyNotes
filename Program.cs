@@ -11,6 +11,19 @@ using Microsoft.AspNetCore.RateLimiting;
 using MyNotes.Security;
 using System.Threading.RateLimiting;
 
+if ((args.Length == 2 && args[0] == "--import-collections") || (args.Length == 1 && args[0] == "--link-my-gs"))
+{
+    var configuration = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory())
+        .AddJsonFile("appsettings.json").AddJsonFile("appsettings.Production.json", optional: true).AddEnvironmentVariables().Build();
+    var options = new DbContextOptionsBuilder<MovieReviews.Data.AppDbContext>()
+        .UseSqlServer(configuration.GetConnectionString("MovieReview")).Options;
+    await using var database = new MovieReviews.Data.AppDbContext(options);
+    await database.Database.MigrateAsync();
+    if (args[0] == "--link-my-gs") await MovieReviews.Services.PerformerRankingService.LinkMyGsAsync(database);
+    else await MovieReviews.Services.CollectionArchiveImporter.ImportAsync(database, args[1]);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
@@ -124,6 +137,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapBookmarkModule();
 app.MapPrivateAccess();
+app.MapCollectionArchives();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

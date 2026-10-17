@@ -1,0 +1,148 @@
+// Run from a disposable net9.0 console project referencing MyNotes.csproj.
+using System.IO.Compression;
+using System.Reflection;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using MovieReviews.Data;
+using MovieReviews.Services;
+using MyNotes.Security;
+
+var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(
+    "Server=.\\MSSQLSERVER2;Database=MovieReviews;Trusted_Connection=True;TrustServerCertificate=True;").Options;
+var factory = new PooledDbContextFactory<AppDbContext>(options);
+void Check(bool success, string message) { if (!success) throw new Exception(message); }
+await using var db = await factory.CreateDbContextAsync();
+Check(!db.Database.HasPendingModelChanges(), "MovieReview model and migration snapshot differ");
+var archiveRoot = args[0];
+var auditRoot = args[1];
+var folders = await db.ArchiveCollections.AsNoTracking().ToListAsync();
+Check(folders.Count == 327, "Expected 327 source collections");
+foreach (var folder in folders)
+{
+    var source = await File.ReadAllBytesAsync(Path.Combine(archiveRoot, folder.ArchiveName));
+    Check(source.SequenceEqual(folder.OriginalArchive), "Original ZIP bytes differ: " + folder.ArchiveName);
+    Check(Convert.ToHexString(SHA256.HashData(source)) == folder.Sha256, "Hash mismatch");
+}
+var all = await db.ArchiveItems.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
+Check(all.Count == 6048, "Expected 6,048 records");
+Check(all.Count(x => x.SceneId != null) == 25, "Expected 25 scene links");
+Check(all.Count(x => x.PerformerId != null) == 29, "Expected 29 performer links");
+Check(all.Count(x => x.Progress.Length > 0) == 217, "Expected 217 page markers");
+var exports = all.Select(x => new { ArchiveName = folders.Single(f => f.Id == x.ArchiveCollectionId).ArchiveName, x.SourceRow, x.SourceNote, x.SourceData });
+await File.WriteAllTextAsync(Path.Combine(auditRoot, "verified-items.json"), JsonSerializer.Serialize(exports));
+Console.WriteLine("All original ZIP bytes, counts, links, saved pages and migration snapshot verified.");
+
+var collections = new CollectionService(factory);
+var list = await collections.SearchAsync(0, "", "", "", "", 0);
+Check(list.Total == 6048 && list.Items.Count == 40, "Archive pagination failed");
+var second = await collections.SearchAsync(0, "", "", "", "", 1);
+Check(!list.Items.Select(x => x.Id).Intersect(second.Items.Select(x => x.Id)).Any(), "Pages overlap");
+var myGs = folders.Single(x => x.ArchiveName == "My_Gs.zip");
+Check((await collections.SearchAsync(myGs.Id, "", "", "", "", 0)).Total == 29, "Folder filter failed");
+Check(CollectionService.SafeUrl("javascript:alert(1)") is null && CollectionService.SafeUrl("https://example.com") is not null, "URL scheme filter failed");
+var edit = (await collections.GetAsync(list.Items[0].Id))!;
+var original = (await collections.GetAsync(edit.Id))!;
+try
+{
+    edit.Notes = "Verification annotation"; edit.Status = "Verification status"; edit.Priority = "Verification priority"; edit.Progress = "Verification progress";
+    await collections.SaveAsync(edit);
+    var saved = (await collections.GetAsync(edit.Id))!;
+    Check(saved.Notes == edit.Notes && saved.SourceData == original.SourceData && saved.SourceNote == original.SourceNote, "Organization save changed original data");
+    Check((await collections.SearchAsync(0, "Verification annotation", "", "Verification status", "Verification priority", 0)).Items.Any(x => x.Id == edit.Id), "Annotation filters failed");
+    edit.SceneId = int.MaxValue;
+    try { await collections.SaveAsync(edit); throw new Exception("Invalid scene link accepted"); } catch (InvalidOperationException) { }
+}
+finally { await collections.SaveAsync(original); }
+Console.WriteLine("Pagination, search, annotations, source preservation and invalid links verified; test annotations restored.");
+
+var ranking = new PerformerRankingService(factory);
+var initial = await ranking.GetAsync();
+Check(initial.Count(x => x.MyGs) == 29, "My Gs ranking membership mismatch");
+var initialPositions = initial.ToDictionary(x => x.Id, x => x.Position);
+var candidates = initial.Where(x => x.MyGs).Take(3).Select(x => x.Id).ToArray();
+try
+{
+    await ranking.MoveAsync(candidates[0], 1);
+    await ranking.MoveAsync(candidates[1], 1);
+    await ranking.MoveAsync(candidates[2], 999999);
+    var result = await ranking.GetAsync();
+    Check(result.First(x => x.Position == 1).Id == candidates[1], "Manual insert failed");
+    await ranking.MoveAsync(candidates[0], 1);
+    await ranking.MoveAsync(candidates[1], null);
+    var positions = (await ranking.GetAsync()).Where(x => x.Position != null).Select(x => x.Position!.Value).ToArray();
+    Check(positions.SequenceEqual(Enumerable.Range(1, positions.Length)), "Ranking contains gaps or duplicates");
+    try { await ranking.MoveAsync(candidates[0], 0); throw new Exception("Zero rank accepted"); } catch (InvalidOperationException) { }
+}
+finally
+{
+    foreach (var performer in await db.Performers.ToListAsync()) performer.RankingPosition = initialPositions[performer.Id];
+    await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+}
+Console.WriteLine("Manual ranking, insertion, moves, removal, bounds and My Gs filter verified; all original positions restored.");
+
+var access = new PrivateAccessStore(new ConfigurationBuilder().Build());
+var auth = new TestAuth();
+var gated = new PrivateMovieDbContextFactory(options, auth, access);
+try { await gated.CreateDbContextAsync(); throw new Exception("Anonymous database access accepted"); } catch (UnauthorizedAccessException) { }
+auth.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(PrivateAccessStore.SessionClaim, access.CreateSession())], "Test"));
+await using (var unlocked = await gated.CreateDbContextAsync()) Check(await unlocked.ArchiveCollections.CountAsync() == 327, "Unlocked read failed");
+access.Revoke(auth.User);
+try { await gated.CreateDbContextAsync(); throw new Exception("Revoked database access accepted"); } catch (UnauthorizedAccessException) { }
+Console.WriteLine("Anonymous and revoked private database access rejected.");
+
+var testDirectory = Path.Combine(Path.GetTempPath(), "mynotes-archive-test-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(testDirectory);
+var note = "first\n\nthird\r\n\r\nfifth \"quoted\", فارسی";
+string Csv(string text) => "\"" + text.Replace("\"", "\"\"") + "\"";
+var sourceRow = new Dictionary<string, string> { ["id"] = "verification-" + Guid.NewGuid().ToString("N"), ["title"] = "Verifier title", ["note"] = note, ["url"] = "https://example.invalid/test?page=800", ["excerpt"] = "one\n\ntwo" };
+var zipPath = Path.Combine(testDirectory, "verification.zip");
+using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+{
+    using var writer = new StreamWriter(zip.CreateEntry("export.csv").Open(), new UTF8Encoding(false));
+    writer.WriteLine(string.Join(',', sourceRow.Keys));
+    writer.WriteLine(string.Join(',', sourceRow.Values.Select(Csv)));
+}
+var testHash = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(zipPath)));
+var fixturePerformers = new List<int>();
+try
+{
+    await CollectionArchiveImporter.ImportAsync(db, testDirectory);
+    var imported = await db.ArchiveItems.AsNoTracking().SingleAsync(x => x.Collection.Sha256 == testHash);
+    var source = JsonSerializer.Deserialize<Dictionary<string, string>>(imported.SourceData)!;
+    Check(sourceRow.All(x => source[x.Key] == x.Value) && imported.SourceNote == note && imported.Progress == "page=800", "CSV formatting/Unicode/quoted data did not survive import");
+    await CollectionArchiveImporter.ImportAsync(db, testDirectory);
+    Check(await db.ArchiveCollections.CountAsync(x => x.Sha256 == testHash) == 1, "Rerun duplicated fixture");
+    var profiles = Enumerable.Range(1, 3).Select(x => new Performer { Name = "Archive verification " + Guid.NewGuid().ToString("N"), RankingPosition = x, CreatedDate = DateTime.UtcNow, LastUpdate = DateTime.UtcNow }).ToArray();
+    db.Performers.AddRange(profiles); await db.SaveChangesAsync();
+    fixturePerformers.AddRange(profiles.Select(x => x.Id));
+    await db.ArchiveItems.Where(x => x.Id == imported.Id).ExecuteUpdateAsync(x => x.SetProperty(i => i.PerformerId, profiles[0].Id));
+    var performerService = new PerformerService(factory);
+    await performerService.DeleteAsync(profiles[1].Id);
+    Check((await ranking.GetAsync()).Single(x => x.Id == profiles[2].Id).Position == 2, "Deleting a performer left ranking gaps");
+    await performerService.MergeAsync(profiles[0].Id, profiles[2].Id);
+    Check((await ranking.GetAsync()).Single(x => x.Id == profiles[2].Id).Position == 1, "Merge did not compact standings");
+    Check(await db.ArchiveItems.AnyAsync(x => x.Id == imported.Id && x.PerformerId == profiles[2].Id), "Merge lost archive performer link");
+    Console.WriteLine("Profile deletion compacts rankings; profile merge preserves archive links and standings.");
+}
+finally
+{
+    db.ChangeTracker.Clear();
+    await db.ArchiveCollections.Where(x => x.Sha256 == testHash).ExecuteDeleteAsync();
+    await db.Performers.Where(x => fixturePerformers.Contains(x.Id)).ExecuteDeleteAsync();
+    // Keep disposable filesystem fixtures for inspection; no recursive cleanup is required.
+}
+Console.WriteLine("Real importer preserves blank lines, CRLF, quotes, Unicode and progress; rerun is idempotent. Fixture removed from database.");
+Check(await db.ArchiveCollections.CountAsync() == 327 && await db.ArchiveItems.CountAsync() == 6048, "Verification left test data behind");
+Console.WriteLine("ALL COLLECTION AND RANKING CHECKS PASSED");
+
+sealed class TestAuth : AuthenticationStateProvider
+{
+    public ClaimsPrincipal User { get; set; } = new(new ClaimsIdentity());
+    public override Task<AuthenticationState> GetAuthenticationStateAsync() => Task.FromResult(new AuthenticationState(User));
+}

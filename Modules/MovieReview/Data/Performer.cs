@@ -4,6 +4,7 @@ public class Performer
 {
 	public int Id { get; set; }
 	public string Name { get; set; } = "";
+    public int? RankingPosition { get; set; }
 
 	public int? SkinColorId { get; set; }
 	public SkinColor? SkinColor { get; set; }

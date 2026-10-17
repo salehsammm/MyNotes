@@ -198,7 +198,12 @@ public class PerformerService
 		main.LastUpdate = now;
 		source.IsArchived = true;
 		source.LastUpdate = now;
+        foreach (var item in await db.ArchiveItems.Where(x => x.PerformerId == sourceId).ToListAsync())
+            item.PerformerId = mainId;
+        main.RankingPosition ??= source.RankingPosition;
+        source.RankingPosition = null;
 		await db.SaveChangesAsync();
+        await CompactRankingsAsync(db);
 		await transaction.CommitAsync();
 	}
 
@@ -213,9 +218,19 @@ public class PerformerService
 	public async Task DeleteAsync(int id)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 		var p = await db.Performers.FindAsync(id);
 		if (p is null) return;
 		db.Performers.Remove(p);
 		await db.SaveChangesAsync();
+        await CompactRankingsAsync(db);
+        await transaction.CommitAsync();
 	}
+
+    private static async Task CompactRankingsAsync(AppDbContext db)
+    {
+        var ranked = await db.Performers.Where(x => x.RankingPosition != null).OrderBy(x => x.RankingPosition).ThenBy(x => x.Id).ToListAsync();
+        for (int i = 0; i < ranked.Count; i++) ranked[i].RankingPosition = i + 1;
+        await db.SaveChangesAsync();
+    }
 }

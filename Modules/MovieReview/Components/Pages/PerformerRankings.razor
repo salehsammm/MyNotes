@@ -1,0 +1,65 @@
+@page "/moviereview/performer-rankings"
+@rendermode InteractiveServer
+@using MovieReviews.Services
+@inject PerformerRankingService Rankings
+@inject ILogger<PerformerRankings> Logger
+
+<PageTitle>Performer rankings · MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / STANDINGS</div><h1>Performer rankings</h1>
+    <p>Your order, from best to worst. Set a position or use the arrows. Unranked performers stay below the standings.</p></div></div>
+@if (error.Length > 0) { <div class="alert alert-danger" role="alert">@error</div> }
+@if (notice.Length > 0) { <div class="alert alert-success" role="status">@notice</div> }
+<div class="card card-body mb-3"><div class="row g-3">
+    <div class="col-md-5"><label class="form-label" for="ranking-search">Find a performer</label><input id="ranking-search" class="form-control" @bind="search" @bind:event="oninput" /></div>
+    <div class="col-md-4"><label class="form-label" for="ranking-scope">Show</label><select id="ranking-scope" class="form-select" @bind="scope"><option value="mygs">My Gs archive</option><option value="ranked">All ranked performers</option><option value="all">All performers</option></select></div>
+    <div class="col-md-3 d-flex align-items-end"><a href="/moviereview/collections" class="btn btn-outline-secondary">Browse original archives</a></div>
+</div></div>
+<p>@standings.Count(x => x.Position is not null) ranked · @standings.Count(x => x.MyGs) in My Gs. Positions are global; filters keep the same positions.</p>
+@if (busy) { <p role="status">Updating standings…</p> }
+<div class="table-responsive"><table class="table align-middle"><thead><tr><th>Rank</th><th>Performer</th><th>Move to position</th><th>Order</th></tr></thead><tbody>
+@foreach (var performer in Visible())
+{
+    <tr @key="performer.Id"><td><strong>@(performer.Position?.ToString() ?? "—")</strong></td>
+        <td><a href="/moviereview/performers/@performer.Id/view">@performer.Name</a>
+            @if (performer.MyGs) { <span class="badge bg-secondary ms-2">My Gs</span> }
+            @if (performer.MyGs) { <a class="small ms-2" href="/moviereview/collections?performer=@performer.Id">Archived notes &amp; links</a> }
+            @if (performer.Archived) { <small class="ms-2">Archived profile</small> }
+        </td>
+        <td><form class="d-flex gap-2" @onsubmit="() => Place(performer)" @onsubmit:preventDefault>
+            <input type="number" class="form-control" style="max-width:100px" min="1" aria-label="@($"Position for {performer.Name}")" @bind="positions[performer.Id]" @bind:event="oninput" />
+            <button class="btn btn-sm btn-outline-primary" disabled="@busy">Set rank</button></form></td>
+        <td><div class="d-flex gap-2">
+            @if (performer.Position is int rank)
+            {
+                <button class="btn btn-sm btn-outline-secondary" aria-label="@($"Move {performer.Name} up")" @onclick="() => Move(performer.Id, rank - 1)" disabled="@(busy || rank == 1)">↑</button>
+                <button class="btn btn-sm btn-outline-secondary" aria-label="@($"Move {performer.Name} down")" @onclick="() => Move(performer.Id, rank + 1)" disabled="@(busy || rank == standings.Count(x => x.Position is not null))">↓</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Move(performer.Id, null)" disabled="@busy">Unrank</button>
+            }
+            else { <button class="btn btn-sm btn-outline-secondary" @onclick="() => Move(performer.Id, standings.Count(x => x.Position is not null) + 1)" disabled="@busy">Add to standings</button> }
+        </div></td>
+    </tr>
+}
+</tbody></table></div>
+@if (!Visible().Any() && !busy) { <p>No performers match these filters.</p> }
+
+@code {
+    private List<PerformerStanding> standings = [];
+    private Dictionary<int, int?> positions = [];
+    private string search = "", scope = "mygs", error = "", notice = "";
+    private bool busy;
+    protected override async Task OnInitializedAsync() => await Run(Reload);
+    private async Task Reload() { standings = await Rankings.GetAsync(); positions = standings.ToDictionary(x => x.Id, x => x.Position); }
+    private IEnumerable<PerformerStanding> Visible() => standings.Where(x => (scope == "all" || (scope == "mygs" ? x.MyGs : x.Position != null)) && x.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+    private Task Place(PerformerStanding performer) => positions[performer.Id] is int position ? Move(performer.Id, position) : InvalidPosition();
+    private Task InvalidPosition() { error = "Enter a position of 1 or greater."; return Task.CompletedTask; }
+    private Task Move(int id, int? position) => Run(async () => { await Rankings.MoveAsync(id, position); await Reload(); notice = "Standings saved."; });
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = ""; notice = "";
+        try { await action(); }
+        catch (InvalidOperationException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError(ex, "Performer ranking operation failed"); error = "Could not update standings. Please try again."; }
+        finally { busy = false; }
+    }
+}

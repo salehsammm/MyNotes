@@ -7,6 +7,8 @@ public class AppDbContext : DbContext
 	public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
 	public DbSet<Scene> Scenes => Set<Scene>();
+    public DbSet<ArchiveCollection> ArchiveCollections => Set<ArchiveCollection>();
+    public DbSet<ArchiveItem> ArchiveItems => Set<ArchiveItem>();
 	public DbSet<Studio> Studios => Set<Studio>();
 	public DbSet<Performer> Performers => Set<Performer>();
 	public DbSet<ScenePerformer> ScenePerformers => Set<ScenePerformer>();
@@ -25,6 +27,16 @@ public class AppDbContext : DbContext
 
 	protected override void OnModelCreating(ModelBuilder b)
 	{
+        b.Entity<ArchiveCollection>().Property(x => x.Sha256).HasMaxLength(64);
+        b.Entity<ArchiveCollection>().HasIndex(x => x.Sha256).IsUnique();
+        b.Entity<ArchiveItem>().HasIndex(x => new { x.ArchiveCollectionId, x.SourceRow }).IsUnique();
+        b.Entity<ArchiveItem>().HasOne(x => x.Collection).WithMany(x => x.Items)
+            .HasForeignKey(x => x.ArchiveCollectionId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ArchiveItem>().HasOne(x => x.Scene).WithMany()
+            .HasForeignKey(x => x.SceneId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<ArchiveItem>().HasOne(x => x.Performer).WithMany()
+            .HasForeignKey(x => x.PerformerId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<Performer>().ToTable(t => t.HasCheckConstraint("CK_Performer_RankingPosition", "[RankingPosition] IS NULL OR [RankingPosition] > 0"));
 		b.Entity<SkinColor>().ToTable("SkinColor");
 		b.Entity<BoobSize>().ToTable("BoobSize");
 		b.Entity<AssSize>().ToTable("AssSize");

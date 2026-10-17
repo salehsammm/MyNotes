@@ -1,0 +1,111 @@
+@page "/moviereview/collections"
+@rendermode InteractiveServer
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject CollectionService CollectionsService
+@inject ILogger<Collections> Logger
+
+<PageTitle>Collections · MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR LIBRARY / ARCHIVES</div><h1>Collections</h1>
+    <p>Your saved archive data. Original files and notes stay intact; add your own organization below.</p></div></div>
+@if (PerformerFilter > 0) { <p>Showing this performer's archived bookmarks and original notes. <a href="/moviereview/collections">Show all archives</a></p> }
+
+@if (error.Length > 0) { <div class="alert alert-danger" role="alert">@error</div> }
+@if (notice.Length > 0) { <div class="alert alert-success" role="status">@notice</div> }
+<form @onsubmit="Search" @onsubmit:preventDefault class="card card-body mb-3">
+    <div class="row g-2">
+        <div class="col-md-4"><label for="archive-folder" class="form-label">Archive / folder</label>
+            <select id="archive-folder" class="form-select" @bind="folder"><option value="0">All archives (@folders.Sum(x => x.Count) items)</option>
+                @foreach (var f in folders) { <option value="@f.Id">@f.Name (@f.Count)</option> }
+            </select></div>
+        <div class="col-md-5"><label for="archive-search" class="form-label">Search titles, URLs, notes, folders</label><input id="archive-search" class="form-control" @bind="search" /></div>
+        <div class="col-md-3"><label for="archive-kind" class="form-label">Type</label><select id="archive-kind" class="form-select" @bind="kind"><option value="">All types</option>
+            @foreach (var k in CollectionService.Kinds) { <option>@k</option> }</select></div>
+        <div class="col-md-4"><label for="archive-status" class="form-label">Status contains</label><input id="archive-status" class="form-control" @bind="status" /></div>
+        <div class="col-md-4"><label for="archive-priority" class="form-label">Priority contains</label><input id="archive-priority" class="form-control" @bind="priority" /></div>
+        <div class="col-md-4 d-flex align-items-end"><button class="btn btn-primary" disabled="@busy">Search archives</button></div>
+    </div>
+</form>
+@if (folder > 0)
+{
+    <p><a class="btn btn-outline-secondary" href="/moviereview/collections/@folder/archive">Download original ZIP</a>
+        <small class="ms-2">@folders.FirstOrDefault(x => x.Id == folder)?.ArchiveName</small></p>
+}
+@if (edit is not null)
+{
+    <section class="card mb-4" aria-label="Edit archive item">
+        <div class="card-header"><h2 class="h5">@edit.Title</h2><small>Original record #@edit.SourceRow · @folders.FirstOrDefault(x => x.Id == edit.ArchiveCollectionId)?.ArchiveName</small></div>
+        <div class="card-body">
+            <EditForm Model="edit" OnSubmit="Save" FormName="archive-item">
+                <div class="row g-3">
+                    <div class="col-md-4"><label for="item-kind" class="form-label">Type</label><InputSelect id="item-kind" class="form-select" @bind-Value="edit.Kind">@foreach (var k in CollectionService.Kinds) { <option>@k</option> }</InputSelect></div>
+                    <div class="col-md-4"><label for="item-status" class="form-label">Status</label><input id="item-status" class="form-control" @bind="edit.Status" @bind:event="oninput" /></div>
+                    <div class="col-md-4"><label for="item-priority" class="form-label">Priority</label><input id="item-priority" class="form-control" @bind="edit.Priority" @bind:event="oninput" /></div>
+                    <div class="col-md-8"><label for="item-progress" class="form-label">Saved page / progress</label><input id="item-progress" class="form-control" @bind="edit.Progress" @bind:event="oninput" /></div>
+                    <div class="col-md-4"><label for="item-scene" class="form-label">Linked scene ID (optional)</label><input type="number" min="1" id="item-scene" class="form-control" @bind="edit.SceneId" @bind:event="oninput" /></div>
+                    <div class="col-md-4"><label for="item-performer" class="form-label">Linked performer ID (optional)</label><input type="number" min="1" id="item-performer" class="form-control" @bind="edit.PerformerId" @bind:event="oninput" /></div>
+                    <div class="col-12"><label for="item-notes" class="form-label">Your notes</label><textarea id="item-notes" class="form-control" rows="5" @bind="edit.Notes" @bind:event="oninput"></textarea></div>
+                </div>
+                <div class="mt-3"><button class="btn btn-primary" disabled="@busy">Save organization</button> <button type="button" class="btn btn-outline-secondary" @onclick="Close" disabled="@busy">Close</button></div>
+            </EditForm>
+            @if (edit.SourceNote.Length > 0) { <h3 class="h6 mt-4">Original note / text</h3><pre class="archive-text">@edit.SourceNote</pre> }
+            <details class="mt-3"><summary>Original export metadata</summary><pre class="archive-text">@edit.SourceData</pre></details>
+        </div>
+    </section>
+}
+<div class="d-flex justify-content-between align-items-center mb-3"><span>@total items · Page @(page + 1) of @Math.Max(1, (total + 39) / 40)</span>
+    <div><button class="btn btn-sm btn-outline-secondary" @onclick="Previous" disabled="@(busy || page == 0)">Previous</button>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Next" disabled="@(busy || (page + 1) * 40 >= total)">Next</button></div></div>
+@if (busy) { <p role="status">Loading…</p> }
+else if (items.Count == 0) { <div class="empty-state"><h3>No archive items found</h3><p>Choose another folder or adjust the search.</p></div> }
+else
+{
+    @foreach (var item in items)
+    {
+        <article class="card mb-3" @key="item.Id"><div class="card-body">
+            <div class="d-flex justify-content-between gap-3"><h2 class="h5">@item.Title</h2><span class="badge bg-secondary align-self-start">@item.Kind</span></div>
+            <p class="small">@folders.FirstOrDefault(x => x.Id == item.ArchiveCollectionId)?.Name · #@item.SourceRow
+                @if (item.Status.Length > 0) { <span> · Status: @item.Status</span> }
+                @if (item.Priority.Length > 0) { <span> · Priority: @item.Priority</span> }
+                @if (item.Progress.Length > 0) { <span> · Progress: @item.Progress</span> }
+            </p>
+            @if (item.SourceNote.Length > 0) { <pre class="archive-text">@Excerpt(item.SourceNote)</pre> }
+            @if (item.Notes.Length > 0) { <p class="archive-text">@Excerpt(item.Notes)</p> }
+            <div class="d-flex flex-wrap gap-2">
+                @if (CollectionService.SafeUrl(item.Url) is string safeUrl) { <a class="btn btn-sm btn-outline-secondary" href="@safeUrl" target="_blank" rel="noopener noreferrer">Open saved link ↗</a> }
+                @if (item.AttachmentName is not null) { <a class="btn btn-sm btn-outline-secondary" href="/moviereview/collections/items/@item.Id/file" target="_blank" rel="noopener noreferrer">Open archived file</a> }
+                @if (item.SceneId is int scene) { <a class="btn btn-sm btn-outline-secondary" href="/moviereview/scenes/@scene/view">Linked review</a> }
+                @if (item.PerformerId is int performer) { <a class="btn btn-sm btn-outline-secondary" href="/moviereview/performers/@performer/view">Performer profile</a> }
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => Open(item.Id)">View / organize</button>
+            </div>
+        </div></article>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "performer")] public int PerformerFilter { get; set; }
+    private List<CollectionSummary> folders = [];
+    private List<ArchiveItem> items = [];
+    private ArchiveItem? edit;
+    private int folder, page, total;
+    private string search = "", kind = "", status = "", priority = "", error = "", notice = "";
+    private bool busy;
+    protected override async Task OnParametersSetAsync() => await Run(async () => { folders = await CollectionsService.FoldersAsync(); page = 0; await Load(); });
+    private async Task Load() { var result = await CollectionsService.SearchAsync(folder, search, kind, status, priority, page, PerformerFilter); items = result.Items; total = result.Total; }
+    private Task Search() => Run(async () => { page = 0; await Load(); });
+    private Task Previous() => Run(async () => { page = Math.Max(0, page - 1); await Load(); });
+    private Task Next() => Run(async () => { if ((page + 1) * 40 < total) page++; await Load(); });
+    private Task Open(int id) => Run(async () => { edit = await CollectionsService.GetAsync(id); });
+    private void Close() { edit = null; notice = ""; }
+    private Task Save() => Run(async () => { if (edit is null) return; await CollectionsService.SaveAsync(edit); notice = "Saved. Original archive data is preserved."; edit = await CollectionsService.GetAsync(edit.Id); await Load(); });
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = ""; notice = "";
+        try { await action(); }
+        catch (InvalidOperationException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError(ex, "Archive collection operation failed"); error = "Could not load or save the archive. Please try again."; }
+        finally { busy = false; }
+    }
+    private static string Excerpt(string value) => value.Length > 450 ? value[..450] + "…" : value;
+}
