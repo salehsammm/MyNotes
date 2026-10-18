@@ -11,6 +11,8 @@ This module was brought from `F:\My.Prog\BookmarkCounter\BookmarkCounter\Bookmar
 
 The module reads the configured Edge Bookmarks JSON file and counts URL nodes recursively within `YT_Prio`, including subfolders. CountLogger records a snapshot at startup and every hour. ChecklistBackfiller ensures checklist progress rows at startup and every 30 minutes. The application must keep running for these workers to run; closing a browser tab does not stop them.
 
+The dashboard question preview shows up to four questions, prioritizing unanswered questions and filling any remaining slots with answered questions.
+
 ## Code map
 
 - `Modules/BookmarkCounter/BookmarkModule.cs`: registrations, prefixed endpoint mappings, and request validation.

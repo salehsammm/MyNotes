@@ -125,7 +125,7 @@ async function loadQuestionPreview() {
       list.append(emptyState('No questions yet', 'Keep a curiosity here whenever it comes to mind.'));
       return;
     }
-    for (const q of [...open.slice(0, 3), ...answered.slice(0, 1)]) {
+    for (const q of [...open, ...answered].slice(0, 4)) {
       const link = document.createElement('a');
       link.href = '/bookmarks/questions';
       link.className = 'question-preview-item';
