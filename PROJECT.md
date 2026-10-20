@@ -30,6 +30,12 @@ All packages and compiled Razor components belong to `MyNotes.csproj`. Root `Com
 
 Build with `dotnet build`, then start and verify the affected module. Update its guide when changing behavior, and this guide when changing shared architecture. Check route prefixes, static asset URLs, and navigation after copying or adding pages. Do not share or rename module entities just because their names overlap.
 
+## Local IIS deployment
+
+After every completed task, verify the changes, commit only the task's changes, publish a Release build with `dotnet publish MyNotes.csproj -c Release -o bin/Release/net9.0/publish`, and deploy that staged build to the existing IIS site at `http://localhost:5050`. Create a timestamped backup of the deployed files first, preserve machine-local configuration (including `appsettings.Production.json`), keep `app_offline.htm` in place while copying, and remove it after a successful copy. Verify the affected routes on port 5050 before reporting the task complete. If deployment or verification is blocked, report that explicitly instead of claiming the live site is updated.
+
+`scripts/Deploy-LocalIis.ps1` performs the Release publish, backup, deployment, configuration checks, and basic route verification. Run it from a PowerShell session with write access to the IIS folder. Add verification of any other routes affected by the task. If copying or file verification fails, it leaves the site offline and reports the backup location for recovery.
+
 For migrations, always specify the context and output directory:
 
 ```powershell
