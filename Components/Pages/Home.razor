@@ -34,6 +34,7 @@
                     <button class="filter @(filter == "Movies" ? "active" : "")" @onclick="ShowMovies">Movies</button>
                     <button class="filter @(filter == "Series" ? "active" : "")" @onclick="ShowSeries">Series</button>
                     <button class="filter @(filter == "Not on IMDb" ? "active" : "")" @onclick="ShowNotOnImdb">Not on IMDb</button>
+                    <button class="filter @(filter == "Needs adding" ? "active" : "")" @onclick="ShowNeedsAdding" title="Movies missing IMDb or Letterboxd; series missing IMDb">Needs adding</button>
                 </div>
                 <input class="search" placeholder="Search titles…" @bind="search" @bind:event="oninput" aria-label="Search titles" />
                 <div class="library-list">
@@ -163,7 +164,8 @@
     private static string EpisodeLabel(Episode episode) => $"S{episode.SeasonNumber:00} · E{episode.EpisodeNumber:00}";
     private MediaItem? selectedItem => items.FirstOrDefault(x => x.Id == selectedId);
     private IEnumerable<MediaItem> FilteredItems => items.Where(x =>
-        (filter == "All" || (filter == "Movies" && x.Kind == MediaKind.Movie) || (filter == "Series" && x.Kind == MediaKind.Series) || (filter == "Not on IMDb" && !x.SavedToImdb)) &&
+        (filter == "All" || (filter == "Movies" && x.Kind == MediaKind.Movie) || (filter == "Series" && x.Kind == MediaKind.Series) || (filter == "Not on IMDb" && !x.SavedToImdb) ||
+         (filter == "Needs adding" && (!x.SavedToImdb || (x.Kind == MediaKind.Movie && !x.SavedToLetterboxd)))) &&
         x.Title.Contains(search, StringComparison.CurrentCultureIgnoreCase));
 
     protected override async Task OnInitializedAsync() => await Refresh();
@@ -178,6 +180,7 @@
     private void ShowMovies() => filter = "Movies";
     private void ShowSeries() => filter = "Series";
     private void ShowNotOnImdb() => filter = "Not on IMDb";
+    private void ShowNeedsAdding() => filter = "Needs adding";
     private void StartNew()
     {
         selectedId = null;
