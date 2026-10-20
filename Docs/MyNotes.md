@@ -15,6 +15,7 @@ At startup, `Program.cs` calls `Database.MigrateAsync()`. This creates the datab
 ## Data model
 
 - `MediaItem` represents either a movie or a series. It stores the title, optional release year, optional overall rating out of 10, and freeform Unicode review text.
+- In the movie/series editor, **Ctrl+S** (or **Cmd+S**) submits the same validated form as **Save changes**, including the current field value. Repeated saves are ignored while saving. The shortcut is inactive while an episode or season dialog is open and is removed when leaving the journal.
 - `SavedToImdb` is a checkbox on each title; `SavedToLetterboxd` is shown only for movies, including its library indicator. The library has a **Not on IMDb** filter and a **Needs adding** filter. **Needs adding** shows movies with either checkbox unchecked and series with IMDb unchecked, ignoring Letterboxd for series. It works together with title search.
 - `Episode` belongs to a series and stores season/episode numbers, optional title, optional rating, and freeform Unicode notes or review.
 - **Add season** on a saved series creates episodes 1 through the chosen count in one save (default 10). The season defaults to the next season and can be changed to fill an existing one. Existing episodes, ratings, notes and episode 0 specials are preserved; only missing episodes are added, with blank ratings and notes. Seasons accept 1–999 and episode counts 1–9999.

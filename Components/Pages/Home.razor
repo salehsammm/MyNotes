@@ -55,7 +55,7 @@
 
             <section class="editor">
                 <div class="section-heading"><h2>@(selectedId is null ? "Add a title" : "Your notes")</h2><span class="micro">RATINGS ARE OUT OF 10</span></div>
-                <EditForm Model="mediaForm" OnValidSubmit="SaveMedia" FormName="media">
+                <EditForm id="media-form" Model="mediaForm" OnValidSubmit="SaveMedia" FormName="media">
                     <DataAnnotationsValidator />
                     <div class="form-grid">
                         <div class="field"><label for="media-title">Title</label><InputText id="media-title" @bind-Value="mediaForm.Title" placeholder="e.g. Silo" /><ValidationMessage For="() => mediaForm.Title" /></div>
@@ -93,7 +93,7 @@
                         </div>
                         <div class="field wide"><label for="media-review">Review <span>optional · any language</span></label><InputTextArea id="media-review" @bind-Value="mediaForm.Review" rows="7" placeholder="What did you think?" /></div>
                     </div>
-                    <div class="form-actions"><button type="submit" class="button primary">@(selectedId is null ? "Save title" : "Save changes")</button>@if (selectedId is not null) { <button type="button" class="button ghost" @onclick="StartNew">New entry</button> }</div>
+                    <div class="form-actions"><button type="submit" class="button primary" disabled="@savingMedia" title="Save (Ctrl+S)">@(savingMedia ? "Saving…" : selectedId is null ? "Save title" : "Save changes")</button><span class="micro">Ctrl+S to save</span>@if (selectedId is not null) { <button type="button" class="button ghost" @onclick="StartNew">New entry</button> }</div>
                 </EditForm>
 
                 <dialog @ref="seasonDialog" class="episode-dialog" aria-labelledby="season-dialog-heading" @oncancel="CloseSeason">
@@ -158,6 +158,7 @@
     private bool confirmDelete;
     private ElementReference episodeDialog;
     private IJSObjectReference? journalModule;
+    private bool savingMedia;
     private string? episodeError;
     private bool confirmEpisodeDelete;
     private bool savingEpisode;
@@ -202,6 +203,8 @@
 
     private async Task SaveMedia()
     {
+        if (savingMedia) return;
+        savingMedia = true;
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
@@ -227,6 +230,14 @@
             message = "Saved successfully.";
         }
         catch (Exception ex) { error = $"Could not save title: {ex.Message}"; }
+        finally { savingMedia = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js?v=2");
+        await journalModule.InvokeVoidAsync("registerSaveShortcut", "media-form");
     }
 
     private void ResetEpisode()
@@ -246,7 +257,7 @@
 
     private async Task OpenEpisode()
     {
-        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js");
+        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js?v=2");
         await journalModule.InvokeVoidAsync("openEpisode", episodeDialog);
     }
 
@@ -260,7 +271,12 @@
     {
         if (journalModule is not null)
         {
-            try { await journalModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+            try
+            {
+                await journalModule.InvokeVoidAsync("unregisterSaveShortcut", "media-form");
+                await journalModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
         }
     }
 
