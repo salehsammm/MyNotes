@@ -72,6 +72,16 @@ The importer migrates only MovieReview, uses a transaction for the batch, and sk
 
 The external audit at `F:\Tala\1\z1\aaa\ForCodex2-audit` contains inventory, fingerprints, source snapshots, reconciliation, import/test logs and a pre-import SQL backup. Verification compares every original ZIP byte and every CSV field, tests rerun safety and formatting with a disposable fixture, checks search/edit/pagination, validates manual ranking and profile merge/delete behavior, and checks live-session protection. `scripts/verify_collections.cs.template` is the reproducible service/import verification harness, intended for a disposable console project under `bin` referencing `MyNotes.csproj`. It restores test edits and removes its own database fixtures.
 
+## Review vocabulary
+
+The Guide (`/moviereview/guide`) and the scene editor's **Vocabulary** panel read the same editable database entries. Search covers both the English term and its description, including Persian meanings.
+
+On October 21, 2026, `scripts/Expand-ReviewVocabulary.sql` added 56 terms and phrases and filled 60 previously empty explanations. The guide now has 151 entries in nine sections, including **Enthusiasm / attitude** and **Ready-to-use review phrases**. Existing terms, custom descriptions, and their order were preserved. A JSON backup of the previous guide was saved under local `artifacts/` before applying the update.
+
+For **با اکراه**, use **reluctantly / with reluctance** when the performance conveys hesitation or unwillingness. Use **half-heartedly** for little enthusiasm or effort, and **going through the motions** for mechanically carrying out the actions. The guide includes Persian meanings and neutral review examples, and distinguishes low enthusiasm from quiet or reserved expression.
+
+The SQL script is an explicit, repeatable content update for the existing MovieReviews database. It adds missing entries and fills blank descriptions without replacing custom text. It is not run at startup, so guide entries remain editable and deletable. Rerunning it can restore deleted catalog entries; run it only when intentionally refreshing the reference vocabulary.
+
 ## Code map
 
 - `Modules/MovieReview/MovieReviewModule.cs`: service registrations and context factory.
