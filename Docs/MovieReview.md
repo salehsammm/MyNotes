@@ -4,6 +4,8 @@ This module was brought from `F:\My.Prog\MovieReview\MovieReviews\MovieReviews` 
 
 ## Features and routes
 
+The overview (`/moviereview`) includes a **Random number** tool. Enter a maximum whole number from 1 to 2,147,483,647, then click **Generate** or press Enter to pick uniformly from 1 through that maximum, including both endpoints. Generate again for another pick; repeats are possible. Changing the maximum clears the previous result. The tool does not change any collection data.
+
 All original pages use the `/moviereview` prefix: overview, scenes, scene detail/edit/new, performers, performer detail/edit/new, watchlist, studios, studio detail, stats, trophies, ideas, notes, note editor, research, research editor/view, guide, and options.
 
 Scene reviews support drafts, pinned drafts, saved playback position, performer associations and overrides, ratings, tags, locations and positions. Performer features include archive/watchlist flags and attribute details. Notes render Markdown with Markdig. Trophy text import remains available through `dotnet run -- --import-trophies <file>` in the MyNotes project.
@@ -76,9 +78,13 @@ The external audit at `F:\Tala\1\z1\aaa\ForCodex2-audit` contains inventory, fin
 
 The Guide (`/moviereview/guide`) and the scene editor's **Vocabulary** panel read the same editable database entries. Search covers both the English term and its description, including Persian meanings.
 
-On October 21, 2026, `scripts/Expand-ReviewVocabulary.sql` added 56 terms and phrases and filled 60 previously empty explanations. The guide now has 151 entries in nine sections, including **Enthusiasm / attitude** and **Ready-to-use review phrases**. Existing terms, custom descriptions, and their order were preserved. A JSON backup of the previous guide was saved under local `artifacts/` before applying the update.
+On October 21, 2026, `scripts/Expand-ReviewVocabulary.sql` added 56 terms and phrases and filled 60 previously empty explanations. Follow-ups added nine terms and examples for low energy and sleepiness, plus 16 breast-shape terms, bringing the guide to 176 entries in ten sections, including **Enthusiasm / attitude**, **Ready-to-use review phrases**, and **Breast shape / appearance**. Existing terms, custom descriptions, and their order were preserved. JSON backups of the previous guide were saved under local `artifacts/` before applying each update.
 
 For **با اکراه**, use **reluctantly / with reluctance** when the performance conveys hesitation or unwillingness. Use **half-heartedly** for little enthusiasm or effort, and **going through the motions** for mechanically carrying out the actions. The guide includes Persian meanings and neutral review examples, and distinguishes low enthusiasm from quiet or reserved expression.
+
+For **لَش / بی‌حال**, use **sluggish** for slow, low-energy movement, **groggy** for a sleepy, foggy appearance like someone who has just woken up, **lethargic** for marked lack of energy, or **listless** for little energy or interest. **Numb** means loss of sensation or emotional feeling and is not a synonym for ordinary sleepiness. The guide includes searchable Persian explanations and sample review sentences.
+
+The performer editor, the scene editor's new/edit-performer dialog, and each scene-specific boobs override have an expandable **Shape vocabulary / راهنمای فرم** helper. It loads the editable **Breast shape / appearance** guide entries on demand. Examples distinguish shape (rounded, teardrop-shaped, lower-hanging), fullness, spacing, and projection from size, softness, or a subjective quality rating. These are descriptions rather than fixed categories; users can combine them in the existing free-text fields.
 
 The SQL script is an explicit, repeatable content update for the existing MovieReviews database. It adds missing entries and fills blank descriptions without replacing custom text. It is not run at startup, so guide entries remain editable and deletable. Rerunning it can restore deleted catalog entries; run it only when intentionally refreshing the reference vocabulary.
 

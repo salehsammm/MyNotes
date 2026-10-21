@@ -15,7 +15,8 @@ INSERT @Sections (Name, Icon) VALUES
 (N'Flow', N'〰'),
 (N'Overall quality words', N'★'),
 (N'Enthusiasm / attitude', N'💬'),
-(N'Ready-to-use review phrases', N'✍');
+(N'Ready-to-use review phrases', N'✍'),
+(N'Breast shape / appearance', N'◯');
 
 DECLARE @Entries TABLE (Id int IDENTITY, SectionName nvarchar(200), Text nvarchar(200), Description nvarchar(max));
 INSERT @Entries (SectionName, Text, Description) VALUES
@@ -160,6 +161,13 @@ INSERT @Entries (SectionName, Text, Description) VALUES
 (N'Enthusiasm / attitude', N'reserved', N'خوددار / کم‌ابراز؛ restrained in expression, without necessarily lacking interest.'),
 (N'Enthusiasm / attitude', N'wholeheartedly', N'از صمیم دل / با تمام وجود؛ with full commitment and enthusiasm.'),
 (N'Enthusiasm / attitude', N'committed performance', N'اجرای با تعهد و جدیت؛ the performer appears fully invested in the role.'),
+(N'Enthusiasm / attitude', N'sluggish', N'لَش / بی‌حال و کند؛ moves or reacts slowly with little energy. Example: Her movements seem sluggish. Describes visible energy, not willingness.'),
+(N'Enthusiasm / attitude', N'groggy', N'خواب‌آلود و منگ؛ that foggy, not-fully-awake feeling just after waking up. Example: She looks groggy, as if she has just woken up.'),
+(N'Enthusiasm / attitude', N'lethargic', N'رخوت‌زده / کم‌رمق؛ noticeably lacking energy and moving slowly. Example: The performance feels lethargic. Stronger than simply relaxed.'),
+(N'Enthusiasm / attitude', N'listless', N'بی‌رمق و بی‌انگیزه؛ shows little energy or interest. Example: Her delivery comes across as listless.'),
+(N'Enthusiasm / attitude', N'drowsy', N'خواب‌آلود؛ seems sleepy or ready to fall asleep. Does not specifically mean just woken up.'),
+(N'Enthusiasm / attitude', N'low-energy', N'کم‌انرژی؛ a plain, neutral description of a subdued performance. Low energy does not necessarily mean reluctance.'),
+(N'Enthusiasm / attitude', N'numb', N'بی‌حس؛ loss of physical sensation, or emotional feeling. Not the usual word for ordinary sleepiness or low energy; use groggy or sluggish for that.'),
 (N'Ready-to-use review phrases', N'The performance feels half-hearted.', N'اجرا بی‌اشتیاق به نظر می‌رسد؛ a direct way to describe low enthusiasm.'),
 (N'Ready-to-use review phrases', N'The delivery comes across as reluctant.', N'نحوهٔ بیان با اکراه به نظر می‌رسد؛ focuses on the impression conveyed.'),
 (N'Ready-to-use review phrases', N'They seem to be going through the motions.', N'به نظر می‌رسد فقط دارند رفع تکلیف می‌کنند.'),
@@ -169,7 +177,25 @@ INSERT @Entries (SectionName, Text, Description) VALUES
 (N'Ready-to-use review phrases', N'Good framing, let down by poor lighting.', N'کادربندی خوب که نورپردازی ضعیف به آن لطمه زده است.'),
 (N'Ready-to-use review phrases', N'The reactions feel genuine rather than exaggerated.', N'واکنش‌ها طبیعی و باورپذیرند، نه اغراق‌آمیز.'),
 (N'Ready-to-use review phrases', N'Well-paced, with a satisfying build-up.', N'خوش‌ریتم، با اوج‌گیری رضایت‌بخش.'),
-(N'Ready-to-use review phrases', N'Visually polished, but emotionally flat.', N'از نظر بصری پرداخت‌شده، اما از نظر احساسی بی‌روح.');
+(N'Ready-to-use review phrases', N'Visually polished, but emotionally flat.', N'از نظر بصری پرداخت‌شده، اما از نظر احساسی بی‌روح.'),
+(N'Ready-to-use review phrases', N'She seems sluggish and low-energy.', N'به نظر می‌رسد لَش و بی‌حال است؛ describes slow movement and little visible energy.'),
+(N'Ready-to-use review phrases', N'She looks groggy, as if she has just woken up.', N'خواب‌آلود و منگ به نظر می‌رسد، انگار تازه از خواب بیدار شده است؛ an impression rather than a claim about her actual sleep.'),
+(N'Breast shape / appearance', N'rounded', N'گرد؛ a rounded overall outline. Shape, not size or softness.'),
+(N'Breast shape / appearance', N'teardrop-shaped', N'اشکی؛ less full at the top and fuller at the bottom, like a teardrop.'),
+(N'Breast shape / appearance', N'bell-shaped', N'زنگوله‌ای؛ narrower at the top and broader or fuller toward the bottom.'),
+(N'Breast shape / appearance', N'conical', N'مخروطی؛ a tapered, more cone-like outline rather than a rounded one.'),
+(N'Breast shape / appearance', N'fuller at the top', N'پُرتر در قسمت بالا؛ more visible volume in the upper part.'),
+(N'Breast shape / appearance', N'fuller at the bottom', N'پُرتر در قسمت پایین؛ more visible volume in the lower part.'),
+(N'Breast shape / appearance', N'evenly full', N'پُری نسبتاً یکنواخت؛ similar fullness through the upper and lower parts.'),
+(N'Breast shape / appearance', N'shallow', N'کم‌برجسته؛ a broader outline with less forward projection. Does not necessarily mean small.'),
+(N'Breast shape / appearance', N'projected', N'برجسته به سمت جلو؛ extends farther forward from the chest. Does not necessarily mean large.'),
+(N'Breast shape / appearance', N'wide-set', N'با فاصله از هم؛ a wider space between them.'),
+(N'Breast shape / appearance', N'close-set', N'نزدیک به هم؛ a smaller space between them.'),
+(N'Breast shape / appearance', N'outward-pointing', N'رو به بیرون؛ the overall direction is toward the sides rather than straight ahead.'),
+(N'Breast shape / appearance', N'asymmetric', N'نامتقارن؛ the two sides differ in shape or size. A neutral description, not a quality rating.'),
+(N'Breast shape / appearance', N'lower-hanging / pendulous', N'پایین‌تر قرارگرفته / آویخته؛ hangs lower, with more downward drape. Lower-hanging is simple and neutral; pendulous is more formal. Not fallen off.'),
+(N'Breast shape / appearance', N'drooping / sagging', N'افتاده؛ a more direct description of a downward-hanging appearance. Lower-hanging is a gentler alternative. This does not describe softness.'),
+(N'Breast shape / appearance', N'self-supporting', N'فرم خود را بدون تکیه‌گاه حفظ می‌کند؛ holds its shape without visible external support. Describes appearance, not proof of firmness or cosmetic surgery.');
 
 DECLARE @SectionOrder int = COALESCE((SELECT MAX(SortOrder) FROM GuideSections), 0);
 INSERT GuideSections (Name, Icon, SortOrder)

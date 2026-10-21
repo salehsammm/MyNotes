@@ -1,0 +1,71 @@
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject GuideService GuideService
+
+<div class="mt-1">
+    <button type="button" class="btn btn-link btn-sm px-0" @onclick="Toggle" aria-expanded="@(_open ? "true" : "false")">
+        @(_open ? "▾" : "▸") Shape vocabulary / راهنمای فرم
+    </button>
+    @if (_open)
+    {
+        <div class="border rounded p-3 bg-light small">
+            <p class="mb-2">Use shape words in the quality or override field. Size is separate; <strong>soft</strong> describes texture, and <strong>pretty</strong> is an opinion.</p>
+            <p class="mb-2">Example: <strong>rounded, fuller at the bottom</strong>. For افتاده, try <strong>lower-hanging</strong> or <strong>pendulous</strong>.</p>
+            @if (_loading)
+            {
+                <p role="status" class="mb-0">Loading shape words…</p>
+            }
+            else if (_error)
+            {
+                <p role="alert" class="mb-0">Could not load the guide. <button type="button" class="btn btn-link btn-sm" @onclick="Load">Try again</button></p>
+            }
+            else if (_items.Count == 0)
+            {
+                <p class="mb-0">Add shape words in the <a href="/moviereview/guide" target="_blank" rel="noopener">Guide</a> under Breast shape / appearance.</p>
+            }
+            else
+            {
+                <dl class="mb-0">
+                    @foreach (var item in _items)
+                    {
+                        <dt @key="item.Id" class="mt-2">@item.Text</dt>
+                        <dd class="mb-1">@item.Description</dd>
+                    }
+                </dl>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    private bool _loading;
+    private bool _loaded;
+    private bool _error;
+    private List<GuideItem> _items = [];
+
+    private async Task Toggle()
+    {
+        _open = !_open;
+        if (_open && !_loaded && !_loading) await Load();
+    }
+
+    private async Task Load()
+    {
+        if (_loading) return;
+        _loading = true;
+        _error = false;
+        try
+        {
+            var sections = await GuideService.GetAllAsync();
+            _items = sections.Where(s => string.Equals(s.Name, "Breast shape / appearance", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(s => s.Items).OrderBy(i => i.SortOrder).ToList();
+            _loaded = true;
+        }
+        catch
+        {
+            _error = true;
+        }
+        finally { _loading = false; }
+    }
+}
