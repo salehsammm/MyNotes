@@ -1,0 +1,53 @@
+@using System.Globalization
+
+<section class="random-tool dashboard-panel" aria-labelledby="random-number-title">
+    <div>
+        <h3 id="random-number-title">Random number</h3>
+        <p>Pick a whole number from 1 through your maximum.</p>
+    </div>
+    <form @onsubmit="Generate" @onsubmit:preventDefault>
+        <div class="random-input">
+            <label for="random-maximum">Maximum number</label>
+            <input id="random-maximum" class="form-control" type="number" min="1" max="2147483647" step="1"
+                   inputmode="numeric" required value="@_maximum" @oninput="MaximumChanged"
+                   aria-describedby="random-number-feedback" aria-invalid="@(_error is not null ? "true" : "false")" />
+        </div>
+        <button class="btn btn-primary" type="submit">Generate</button>
+    </form>
+    <div id="random-number-feedback" class="random-feedback" role="status" aria-live="polite" aria-atomic="true">
+        @if (_error is not null)
+        {
+            <span class="text-danger">@_error</span>
+        }
+        else if (_result is not null)
+        {
+            <span>Result: <strong>@_result</strong> <small>(1–@_maximum)</small></span>
+        }
+    </div>
+</section>
+
+@code {
+    private string _maximum = "100";
+    private int? _result;
+    private string? _error;
+
+    private void MaximumChanged(ChangeEventArgs args)
+    {
+        _maximum = args.Value?.ToString() ?? "";
+        _result = null;
+        _error = null;
+    }
+
+    private void Generate()
+    {
+        _result = null;
+        if (!int.TryParse(_maximum, NumberStyles.None, CultureInfo.InvariantCulture, out var maximum) || maximum < 1)
+        {
+            _error = "Enter a whole number from 1 to 2,147,483,647.";
+            return;
+        }
+
+        _error = null;
+        _result = (int)Random.Shared.NextInt64(1, (long)maximum + 1);
+    }
+}

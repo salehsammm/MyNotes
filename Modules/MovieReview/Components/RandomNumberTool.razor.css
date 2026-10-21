@@ -1,0 +1,14 @@
+.random-tool {
+    margin-bottom: 24px;
+    padding: 24px;
+}
+
+.random-tool h3 { margin: 0 0 6px; }
+.random-tool p { margin: 0 0 16px; color: #6b7280; }
+.random-tool form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.random-input { flex: 1 1 180px; max-width: 320px; }
+.random-input label { display: block; margin-bottom: 6px; font-weight: 600; }
+.random-feedback { margin-top: 12px; overflow-wrap: anywhere; }
+.random-feedback:empty { display: none; }
+.random-feedback strong { font-size: 1.75rem; margin: 0 6px; }
+.random-feedback small { color: #6b7280; }
