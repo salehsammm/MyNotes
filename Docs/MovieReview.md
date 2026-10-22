@@ -78,6 +78,8 @@ The external audit at `F:\Tala\1\z1\aaa\ForCodex2-audit` contains inventory, fin
 
 The Guide (`/moviereview/guide`) and the scene editor's **Vocabulary** panel read the same editable database entries. Search covers both the English term and its description, including Persian meanings.
 
+In the scene editor's quick-reference Vocabulary panel, each group expands independently by clicking its heading or using the keyboard. All groups start collapsed whenever the panel opens; search continues to filter groups and their entries.
+
 On October 21, 2026, `scripts/Expand-ReviewVocabulary.sql` added 56 terms and phrases and filled 60 previously empty explanations. Follow-ups added nine terms and examples for low energy and sleepiness, plus 16 breast-shape terms, bringing the guide to 176 entries in ten sections, including **Enthusiasm / attitude**, **Ready-to-use review phrases**, and **Breast shape / appearance**. Existing terms, custom descriptions, and their order were preserved. JSON backups of the previous guide were saved under local `artifacts/` before applying each update.
 
 For **با اکراه**, use **reluctantly / with reluctance** when the performance conveys hesitation or unwillingness. Use **half-heartedly** for little enthusiasm or effort, and **going through the motions** for mechanically carrying out the actions. The guide includes Persian meanings and neutral review examples, and distinguishes low enthusiasm from quiet or reserved expression.

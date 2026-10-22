@@ -530,7 +530,25 @@ else
         <input class="form-control mb-3" placeholder="Search words..." @bind="_vocabularySearch" @bind:event="oninput" />
         @if (_vocabularyLoading) { <p>Loading guide...</p> }
         else if (FilteredGuide().Count == 0) { <p class="text-muted">No matching words.</p> }
-        else { @foreach (var group in FilteredGuide()) { <div class="vocab-section"><h4>@group.Icon @group.Name</h4>@foreach (var item in group.Items.Where(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description) || MatchesVocabulary(group.Name))) { <div class="vocab-entry"><strong>@item.Text</strong>@if (!string.IsNullOrWhiteSpace(item.Description)) { <small>@item.Description</small> }</div> }</div> } }
+        else
+        {
+            @foreach (var group in FilteredGuide())
+            {
+                <details class="vocab-section" @key="group.Id">
+                    <summary>@group.Icon @group.Name</summary>
+                    @foreach (var item in group.Items.Where(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description) || MatchesVocabulary(group.Name)))
+                    {
+                        <div class="vocab-entry">
+                            <strong>@item.Text</strong>
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <small>@item.Description</small>
+                            }
+                        </div>
+                    }
+                </details>
+            }
+        }
     </aside>
 }
 
