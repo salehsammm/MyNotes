@@ -231,6 +231,38 @@ namespace MovieReviews.Migrations
                     b.ToTable("GuideItems");
                 });
 
+            modelBuilder.Entity("MovieReviews.Data.GuidePicture", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("GuideSectionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuideSectionId");
+
+                    b.ToTable("GuidePictures");
+                });
+
             modelBuilder.Entity("MovieReviews.Data.GuideSection", b =>
                 {
                     b.Property<int>("Id")
@@ -753,6 +785,17 @@ namespace MovieReviews.Migrations
                 {
                     b.HasOne("MovieReviews.Data.GuideSection", "Section")
                         .WithMany("Items")
+                        .HasForeignKey("GuideSectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Section");
+                });
+
+            modelBuilder.Entity("MovieReviews.Data.GuidePicture", b =>
+                {
+                    b.HasOne("MovieReviews.Data.GuideSection", "Section")
+                        .WithMany()
                         .HasForeignKey("GuideSectionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

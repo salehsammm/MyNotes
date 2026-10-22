@@ -534,19 +534,22 @@ else
         {
             @foreach (var group in FilteredGuide())
             {
-                <details class="vocab-section" @key="group.Id">
-                    <summary>@group.Icon @group.Name</summary>
-                    @foreach (var item in group.Items.Where(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description) || MatchesVocabulary(group.Name)))
-                    {
-                        <div class="vocab-entry">
-                            <strong>@item.Text</strong>
-                            @if (!string.IsNullOrWhiteSpace(item.Description))
-                            {
-                                <small>@item.Description</small>
-                            }
-                        </div>
-                    }
-                </details>
+                <div class="vocab-group" @key="group.Id">
+                    <GuidePictureGallery SectionId="@group.Id" SectionName="@group.Name" />
+                    <details class="vocab-section">
+                        <summary>@group.Icon @group.Name</summary>
+                        @foreach (var item in group.Items.Where(i => MatchesVocabulary(i.Text) || MatchesVocabulary(i.Description) || MatchesVocabulary(group.Name)))
+                        {
+                            <div class="vocab-entry">
+                                <strong>@item.Text</strong>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <small>@item.Description</small>
+                                }
+                            </div>
+                        }
+                    </details>
+                </div>
             }
         }
     </aside>

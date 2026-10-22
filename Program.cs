@@ -138,6 +138,7 @@ app.MapStaticAssets();
 app.MapBookmarkModule();
 app.MapPrivateAccess();
 app.MapCollectionArchives();
+app.MapGuidePictures();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

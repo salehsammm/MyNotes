@@ -80,6 +80,12 @@ The Guide (`/moviereview/guide`) and the scene editor's **Vocabulary** panel rea
 
 In the scene editor's quick-reference Vocabulary panel, each group expands independently by clicking its heading or using the keyboard. All groups start collapsed whenever the panel opens; search continues to filter groups and their entries.
 
+Each group's **Pictures** button, beside its title in both the Guide and quick-reference panel, opens a slideshow with Previous/Next controls, thumbnails, and a picture counter. Use **Add pictures** inside the slideshow to upload up to ten JPEG, PNG, GIF, or WebP files at once (10 MB per picture). Delete the current picture with confirmation; Close or Escape returns to the guide. Uploads are saved immediately and remain available after reopening the panel or restarting the app. Group text can stay collapsed while viewing pictures.
+
+Pictures are stored in the MovieReviews database (`GuidePictures`), and their `/moviereview/guide/pictures/{id}` URLs require an unlocked private session and disable browser caching. Include this database in data backups; publishing the application does not replace uploaded pictures. Deleting a vocabulary group also deletes its pictures.
+
+Run `scripts/Verify-GuidePictures.ps1` to check migrations, upload validation, image persistence, group isolation, and deletion in a disposable SQL database. Add `-Serve` to open a sample gallery at `http://localhost:5058` for browser verification; POST to `/verification/stop` afterward to shut it down and remove the disposable database.
+
 On October 21, 2026, `scripts/Expand-ReviewVocabulary.sql` added 56 terms and phrases and filled 60 previously empty explanations. Follow-ups added nine terms and examples for low energy and sleepiness, plus 16 breast-shape terms, bringing the guide to 176 entries in ten sections, including **Enthusiasm / attitude**, **Ready-to-use review phrases**, and **Breast shape / appearance**. Existing terms, custom descriptions, and their order were preserved. JSON backups of the previous guide were saved under local `artifacts/` before applying each update.
 
 For **با اکراه**, use **reluctantly / with reluctance** when the performance conveys hesitation or unwillingness. Use **half-heartedly** for little enthusiasm or effort, and **going through the motions** for mechanically carrying out the actions. The guide includes Persian meanings and neutral review examples, and distinguishes low enthusiasm from quiet or reserved expression.

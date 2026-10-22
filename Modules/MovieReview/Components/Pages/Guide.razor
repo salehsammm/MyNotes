@@ -35,6 +35,7 @@ else
                     }
                 </span>
                 <span>
+                    <GuidePictureGallery SectionId="@sec.Id" SectionName="@sec.Name" @key="sec.Id" />
                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => StartEditSection(sec)">Edit</button>
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSection(sec.Id, sec.Name)">Delete</button>
                 </span>

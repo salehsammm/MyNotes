@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
 	public DbSet<Note> Notes => Set<Note>();
 	public DbSet<GuideSection> GuideSections => Set<GuideSection>();
 	public DbSet<GuideItem> GuideItems => Set<GuideItem>();
+    public DbSet<GuidePicture> GuidePictures => Set<GuidePicture>();
 	public DbSet<ResearchDoc> ResearchDocs => Set<ResearchDoc>();
 	public DbSet<ResearchSection> ResearchSections => Set<ResearchSection>();
 	public DbSet<TrophyCategory> TrophyCategories => Set<TrophyCategory>();
@@ -27,6 +28,10 @@ public class AppDbContext : DbContext
 
 	protected override void OnModelCreating(ModelBuilder b)
 	{
+        b.Entity<GuidePicture>().Property(p => p.FileName).HasMaxLength(255);
+        b.Entity<GuidePicture>().Property(p => p.ContentType).HasMaxLength(32);
+        b.Entity<GuidePicture>().HasOne(p => p.Section).WithMany()
+            .HasForeignKey(p => p.GuideSectionId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ArchiveCollection>().Property(x => x.Sha256).HasMaxLength(64);
         b.Entity<ArchiveCollection>().HasIndex(x => x.Sha256).IsUnique();
         b.Entity<ArchiveItem>().HasIndex(x => new { x.ArchiveCollectionId, x.SourceRow }).IsUnique();

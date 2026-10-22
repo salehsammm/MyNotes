@@ -5,6 +5,49 @@ namespace MovieReviews.Services;
 
 public class GuideService
 {
+    public const int MaxPictureBytes = 10 * 1024 * 1024;
+
+    public async Task<List<GuidePictureInfo>> GetPicturesAsync(int sectionId)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        return await db.GuidePictures.AsNoTracking().Where(p => p.GuideSectionId == sectionId)
+            .OrderBy(p => p.Id).Select(p => new GuidePictureInfo(p.Id, p.FileName)).ToListAsync();
+    }
+
+    public async Task AddPictureAsync(int sectionId, string fileName, byte[] content)
+    {
+        if (content.Length == 0 || content.Length > MaxPictureBytes)
+            throw new ArgumentException("Each picture must be between 1 byte and 10 MB.");
+        var contentType = DetectPictureType(content);
+        await using var db = await _factory.CreateDbContextAsync();
+        if (!await db.GuideSections.AnyAsync(s => s.Id == sectionId))
+            throw new InvalidOperationException("This vocabulary group no longer exists.");
+        var name = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(name)) name = "Picture";
+        db.GuidePictures.Add(new GuidePicture
+        {
+            GuideSectionId = sectionId, FileName = name[..Math.Min(name.Length, 255)],
+            ContentType = contentType, Content = content
+        });
+        await db.SaveChangesAsync();
+    }
+
+    public async Task DeletePictureAsync(int sectionId, int pictureId)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        await db.GuidePictures.Where(p => p.Id == pictureId && p.GuideSectionId == sectionId).ExecuteDeleteAsync();
+    }
+
+    private static string DetectPictureType(byte[] content)
+    {
+        var bytes = content.AsSpan();
+        if (bytes.StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return "image/png";
+        if (bytes.StartsWith(new byte[] { 255, 216, 255 })) return "image/jpeg";
+        if (bytes.StartsWith("GIF87a"u8) || bytes.StartsWith("GIF89a"u8)) return "image/gif";
+        if (bytes.Length >= 12 && bytes[..4].SequenceEqual("RIFF"u8) && bytes.Slice(8, 4).SequenceEqual("WEBP"u8)) return "image/webp";
+        throw new ArgumentException("Choose JPEG, PNG, GIF, or WebP pictures.");
+    }
+
 	private readonly IDbContextFactory<AppDbContext> _factory;
 
 	public GuideService(IDbContextFactory<AppDbContext> factory)
