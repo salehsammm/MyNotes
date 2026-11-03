@@ -2,6 +2,7 @@ const getElement = id => document.getElementById(id);
 const selectedDate = new Date();
 selectedDate.setHours(0, 0, 0, 0);
 let loadSequence = 0;
+let recentLoadSequence = 0;
 let toastTimer;
 
 function today() {
@@ -94,6 +95,67 @@ async function loadChecklist() {
       list.replaceChildren(emptyState('Could not load items', 'Try refreshing the page.'));
     }
     notify('Could not load the checklist.', true);
+  } finally {
+    if (sequence === loadSequence) await loadRecent();
+  }
+}
+
+async function loadRecent() {
+  const sequence = ++recentLoadSequence;
+  if (!getElement('recentPanel').open) return;
+  const list = getElement('recentItems');
+  const range = getElement('recentRange');
+  const rangeLabel = range.selectedOptions[0].textContent.toLowerCase();
+  try {
+    const items = await request(`/bookmarks/api/checklist/recent?minutes=${range.value}`, { cache: 'no-store' });
+    if (sequence !== recentLoadSequence) return;
+    getElement('recentSummary').textContent = `${items.length} done`;
+    list.replaceChildren();
+    if (!items.length) {
+      list.append(emptyState('No completed tasks in this range', range.value === '0' ? 'Finished tasks will appear here.' : `No tasks were completed in the ${rangeLabel}. Try a longer range.`));
+      return;
+    }
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'recent-item';
+      const title = document.createElement('strong');
+      title.textContent = item.title;
+      const details = document.createElement('span');
+      details.textContent = `${item.recurrence} · ${item.periodStart} · ${item.currentCount}/${item.targetCount}`;
+      const time = document.createElement('time');
+      const completedAt = new Date(item.completedAt);
+      time.dateTime = item.completedAt;
+      time.textContent = completedAt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      time.title = completedAt.toLocaleString();
+      const undo = document.createElement('button');
+      undo.type = 'button';
+      undo.className = 'recent-undo';
+      undo.textContent = 'Undo';
+      undo.setAttribute('aria-label', `Undo completion of ${item.title} for ${item.periodStart}`);
+      undo.title = 'Undo the last count and reopen this task';
+      undo.addEventListener('click', async () => {
+        if (undo.disabled) return;
+        undo.disabled = true;
+        undo.textContent = 'Undoing…';
+        try {
+          await request(`/bookmarks/api/checklist/progress/${item.progressId}/decrement`, { method: 'POST' });
+        } catch {
+          undo.disabled = false;
+          undo.textContent = 'Undo';
+          notify('Could not undo this completion. Please try again.', true);
+          return;
+        }
+        row.remove();
+        notify('Completion undone. The task is open again.');
+        await loadChecklist();
+      });
+      row.append(title, details, time, undo);
+      list.append(row);
+    });
+  } catch {
+    if (sequence !== recentLoadSequence) return;
+    getElement('recentSummary').textContent = 'Unavailable';
+    list.replaceChildren(emptyState('Could not load recent activity', 'Try refreshing the page.'));
   }
 }
 
@@ -304,8 +366,20 @@ getElement('previousDay').addEventListener('click', () => { selectedDate.setDate
 getElement('nextDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() + 1); loadChecklist(); });
 getElement('jumpDate').addEventListener('change', event => { if (event.target.value) { selectedDate.setTime(new Date(`${event.target.value}T00:00:00`).getTime()); loadChecklist(); } });
 getElement('todayButton').addEventListener('click', () => { selectedDate.setTime(today().getTime()); loadChecklist(); });
+try {
+  const savedRange = localStorage.getItem('bookmarkCounterRecentRange');
+  if ([...getElement('recentRange').options].some(option => option.value === savedRange)) {
+    getElement('recentRange').value = savedRange;
+  }
+} catch { /* Keep the default range when browser storage is unavailable. */ }
+getElement('recentRange').addEventListener('change', event => {
+  try { localStorage.setItem('bookmarkCounterRecentRange', event.target.value); } catch { /* The range still works without storage. */ }
+  loadRecent();
+});
+getElement('recentPanel').addEventListener('toggle', loadRecent);
 refreshCount();
 loadChecklist();
 loadQuestionPreview();
 setInterval(refreshCount, 5000);
 setInterval(updateResets, 30000);
+setInterval(loadRecent, 60000);

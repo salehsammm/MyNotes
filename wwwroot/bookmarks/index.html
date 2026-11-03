@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101416">
   <title>Overview · BookmarkCounter</title>
-  <link rel="stylesheet" href="/bookmarks/css/app.css?v=10">
-  <script src="/bookmarks/js/dashboard.js?v=11" defer></script>
+  <link rel="stylesheet" href="/bookmarks/css/app.css?v=11">
+  <script src="/bookmarks/js/dashboard.js?v=12" defer></script>
 </head>
 <body>
   <nav aria-label="MyNotes navigation" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/journal" style="color:#eee">MyNotes journal</a></nav>
@@ -31,6 +31,14 @@
           <div class="count-footer"><span>bookmarks remaining</span><span class="status" id="countStatus">Connecting…</span></div>
         </div>
       </section>
+
+      <details class="recent-panel" id="recentPanel">
+        <summary id="recentTitle">Recently done</summary>
+        <div class="recent-content">
+        <div class="missed-heading"><p>Choose how far back to look. Newest completions first.</p><div class="recent-controls"><label for="recentRange">Show</label><select id="recentRange"><option value="30">Last 30 minutes</option><option value="60">Last hour</option><option value="1440">Last 24 hours</option><option value="2880" selected>Last 2 days</option><option value="10080">Last 7 days</option><option value="43200">Last 30 days</option><option value="0">All time</option></select><span class="progress-summary" id="recentSummary">—</span></div></div>
+        <div class="recent-list" id="recentItems" aria-live="polite"></div>
+        </div>
+      </details>
 
       <section class="workspace" aria-labelledby="checklist-title">
         <div class="section-heading">

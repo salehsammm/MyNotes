@@ -4,12 +4,16 @@ This module was brought from `F:\My.Prog\BookmarkCounter\BookmarkCounter\Bookmar
 
 ## Features and routes
 
-- `/` (with `/bookmarks` as an alias): live Edge bookmark count, daily/weekly/one-time checklist, missed tasks, and question preview.
+- `/` (with `/bookmarks` as an alias): live Edge bookmark count, recent checklist completions with a selectable time range (newest first), daily/weekly/one-time checklist, missed tasks, and question preview. Recently done defaults to the last 2 days; options range from 30 minutes to all time, and the browser remembers the selection. Completion dates and times are shown in local time. `/bookmarks/api/checklist/recent?minutes=2880` accepts a lookback in minutes (0 for all time; maximum 525600), defaulting to 2880.
 - `/bookmarks/history`: history chart, date range and manual count snapshot.
 - `/bookmarks/questions`: questions and optional answers with completion status.
 - `/bookmarks/api/...`: original count, history, checklist and question endpoints under the module prefix.
 
 The module reads the configured Edge Bookmarks JSON file and counts URL nodes recursively within `YT_Prio`, including subfolders. CountLogger records a snapshot at startup and every hour. ChecklistBackfiller ensures checklist progress rows at startup and every 30 minutes. The application must keep running for these workers to run; closing a browser tab does not stop them.
+
+Recently done is a compact disclosure that starts closed on each page load. Open it to load completion history; automatic refreshes only fetch that history while it is open.
+
+Each Recently done entry has an Undo button. It reverses the final count increment for that exact occurrence (keeping earlier counts), clears its completion timestamp, and refreshes the checklist, missed tasks, and recent history. Past required occurrences return to Missed tasks; other occurrences can be viewed on their original date. The recent API includes `progressId` so Undo uses the existing progress decrement endpoint.
 
 The dashboard question preview shows up to four questions, prioritizing unanswered questions and filling any remaining slots with answered questions.
 

@@ -69,6 +69,10 @@ public static class BookmarkModule
         group.MapGet("/api/checklist/missed", async (ChecklistRepository repo) =>
             Results.Ok(await repo.GetMissedAsync()));
 
+        group.MapGet("/api/checklist/recent", async (ChecklistRepository repo, int? minutes) =>
+            minutes is < 0 or > 525600 ? Results.BadRequest() :
+            Results.Ok(await repo.GetRecentCompletionsAsync(minutes ?? 2880)));
+
         group.MapPost("/api/checklist", async (ChecklistRepository repo, ChecklistRequest req) =>
             ValidChecklistRequest(req) ? Results.Ok(await repo.CreateAsync(req)) : Results.BadRequest());
 

@@ -8,6 +8,9 @@ public record ChecklistItemDto(
 	int TargetCount, int CurrentCount, bool Completed, string PeriodStart,
 	bool IsOneTime, int RepeatEveryDays, string? FirstDueDate, bool IsOptional);
 
+public record RecentCompletionDto(int ProgressId, string Title, string Recurrence, string PeriodStart,
+	int CurrentCount, int TargetCount, DateTime CompletedAt);
+
 public record ChecklistRequest(string Title, RecurrenceType Recurrence, int TargetCount,
 	bool IsOneTime = false, DateOnly? ScheduledDate = null,
 	int RepeatEveryDays = 1, DateOnly? FirstDueDate = null, bool IsOptional = false);
@@ -262,6 +265,25 @@ public class ChecklistRepository
 	public Task<ChecklistItemDto?> IncrementAsync(int progressId) => ChangeAsync(progressId, +1);
 	public Task<ChecklistItemDto?> DecrementAsync(int progressId) => ChangeAsync(progressId, -1);
 
+	public async Task<List<RecentCompletionDto>> GetRecentCompletionsAsync(int minutes)
+	{
+		await using var db = await _factory.CreateDbContextAsync();
+		var query = db.ChecklistProgress.AsNoTracking().Include(p => p.Item)
+			.Where(p => p.Item.IsActive && p.CompletedAt != null
+				&& p.CurrentCount >= p.Item.TargetCount);
+		if (minutes > 0)
+		{
+			var since = DateTime.UtcNow.AddMinutes(-minutes);
+			query = query.Where(p => p.CompletedAt >= since);
+		}
+		var rows = await query
+			.OrderByDescending(p => p.CompletedAt).ThenByDescending(p => p.Id)
+			.ToListAsync();
+		return rows.Select(p => new RecentCompletionDto(p.Id, p.Item.Title, p.Item.Recurrence.ToString(),
+			p.PeriodStart.ToString("yyyy-MM-dd"), p.CurrentCount, p.Item.TargetCount,
+			DateTime.SpecifyKind(p.CompletedAt!.Value, DateTimeKind.Utc))).ToList();
+	}
+
 	public async Task<List<ChecklistItemDto>> GetMissedAsync()
 	{
 		await EnsureRowsAsync();
@@ -295,8 +317,11 @@ public class ChecklistRepository
 			.FirstOrDefaultAsync(p => p.Id == progressId);
 		if (row is null) return null;
 
+		var wasCompleted = row.CurrentCount >= row.Item.TargetCount;
 		row.CurrentCount = Math.Clamp(row.CurrentCount + delta, 0, row.Item.TargetCount);
-		row.CompletedAt = row.CurrentCount >= row.Item.TargetCount ? DateTime.UtcNow : null;
+		row.CompletedAt = row.CurrentCount >= row.Item.TargetCount
+			? wasCompleted ? row.CompletedAt ?? DateTime.UtcNow : DateTime.UtcNow
+			: null;
 		await db.SaveChangesAsync();
 
 		return new ChecklistItemDto(
