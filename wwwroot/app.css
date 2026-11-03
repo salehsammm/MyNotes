@@ -69,6 +69,12 @@ h2 span { color: #98a88b; font: 500 12px 'DM Sans', sans-serif; vertical-align: 
 .episodes .section-heading { margin-bottom: 8px; }
 .episode-hint { color: #8b968c; font-size: 11px; margin: 0 0 12px; }
 .episodes .episode-list { margin-bottom: 0; }
+.season-group { min-width: 0; border: 1px solid #303a31; border-radius: 4px; background: #1b211c; }
+.season-heading { cursor: pointer; padding: 14px; color: #bad182; font-size: 13px; font-weight: 700; }
+.season-heading span { margin-left: 10px; color: #929b90; font-size: 11px; font-weight: 400; }
+.season-heading:hover { background: #242e23; }
+.season-heading:focus-visible { outline: 2px solid #c5df8b; outline-offset: 2px; }
+.season-episodes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; padding: 0 8px 8px; }
 .episode-row { padding: 0 12px 0 0; gap: 12px; }
 .episode-details { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 16px; padding: 12px 14px; background: none; border: 0; color: inherit; text-align: left; }
 .episode-note-preview { flex: 1; min-width: 0; color: #929b90; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
