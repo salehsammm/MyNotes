@@ -2,10 +2,32 @@
     color: #a66b00;
 }
 
+.note-heading-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .note-favorite {
-    align-self: flex-start;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #98a88b;
+    font-size: 28px;
+    line-height: 1;
+    padding: 4px;
+    flex-shrink: 0;
 }
 
 .note-favorite[aria-pressed="true"] {
-    border-color: #a66b00;
+    color: #e5b95c;
+}
+
+.note-favorite:hover {
+    color: #e5b95c;
+}
+
+.note-favorite:focus-visible {
+    outline: 2px solid #c5df8b;
+    outline-offset: 2px;
 }

@@ -105,13 +105,18 @@
                 {
                     <div class="note-group-context"><strong dir="auto">@(currentGroup.Category ?? "Uncategorized") / @currentGroup.Name</strong>@if (!string.IsNullOrWhiteSpace(currentGroup.Description)) { <p dir="auto">@currentGroup.Description</p> }<button type="button" class="text-button" @onclick="() => RequestTopic(currentGroup.Id)" disabled="@busy">+ New topic in this group</button></div>
                 }
-                <div class="section-heading"><h2>@(selectedId is null ? (form.Kind == PersonalNoteKind.Diary ? "New diary entry" : "New note") : (form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Your note"))</h2><span class="note-save-state" role="status">@(dirty ? "Unsaved changes" : selectedId is not null ? "Saved" : "")</span></div>
+                <div class="section-heading">
+                    <div class="note-heading-title">
+                        <h2>@(selectedId is null ? (form.Kind == PersonalNoteKind.Diary ? "New diary entry" : "New note") : (form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Your note"))</h2>
+                        <button type="button" class="note-favorite" aria-label="@(form.IsFavorite ? "Remove from favorites" : "Mark as favorite")" title="@(form.IsFavorite ? "Remove from favorites" : "Mark as favorite")" aria-pressed="@(form.IsFavorite ? "true" : "false")" @onclick="ToggleFavorite" disabled="@busy">@(form.IsFavorite ? "★" : "☆")</button>
+                    </div>
+                    <span class="note-save-state" role="status">@(dirty ? "Unsaved changes" : selectedId is not null ? "Saved" : "")</span>
+                </div>
                 <EditForm EditContext="editContext" OnValidSubmit="SaveNote" FormName="personal-note">
                     <DataAnnotationsValidator />
                     <fieldset class="note-fieldset" disabled="@busy">
                         <div class="form-grid">
                             <div class="field wide"><label for="note-title">Title</label><InputText id="note-title" @bind-Value="form.Title" @oninput="MarkDirty" dir="auto" /><ValidationMessage For="() => form.Title" /></div>
-                            <div class="field wide"><button type="button" class="button ghost note-favorite" aria-pressed="@(form.IsFavorite ? "true" : "false")" @onclick="ToggleFavorite"><span class="@(form.IsFavorite ? "favorite-star" : "")" aria-hidden="true">@(form.IsFavorite ? "★" : "☆")</span> @(form.IsFavorite ? "Favorite" : "Mark as favorite")</button><small>Worth reading again · saved with this @(form.Kind == PersonalNoteKind.Diary ? "diary entry" : "note")</small></div>
                             <div class="field"><label for="note-kind">Type</label><InputSelect id="note-kind" @bind-Value="form.Kind"><option value="Note">Note</option><option value="Diary">Diary</option></InputSelect></div>
                             <div class="field"><label for="note-date">@(form.Kind == PersonalNoteKind.Diary ? "Diary date" : "Note date")</label><InputDate id="note-date" @bind-Value="form.NoteDate" /><ValidationMessage For="() => form.NoteDate" /></div>
                             <div class="field wide"><label for="note-group">Note group <span>optional</span></label><InputSelect id="note-group" @bind-Value="form.NoteGroupId" @bind-Value:after="GroupChanged"><option value="">No group</option>@foreach (var group in groups) { <option value="@group.Id">@group.Name</option> }</InputSelect></div>
