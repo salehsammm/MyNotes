@@ -37,6 +37,7 @@ public class SceneService
 	public async Task<Scene> AddAsync(Scene s, IReadOnlyCollection<int>? playlistIds = null)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
 		var links = s.Performers.Select(sp => new ScenePerformer
 		{
@@ -63,6 +64,7 @@ public class SceneService
 		db.Scenes.Add(saved);
         await PlaylistService.SetMembershipAsync(db, saved, playlistIds);
 		await db.SaveChangesAsync();
+        await transaction.CommitAsync();
 		s.Id = saved.Id;
 		s.CreatedDate = saved.CreatedDate;
 		s.LastUpdate = saved.LastUpdate;
@@ -74,6 +76,7 @@ public class SceneService
 	public async Task UpdateAsync(Scene s, IReadOnlyCollection<int>? playlistIds = null)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
 
 		var existing = await db.Scenes.FirstAsync(x => x.Id == s.Id);
 
@@ -124,6 +127,7 @@ public class SceneService
 			});
 		}
 		await db.SaveChangesAsync();
+        await transaction.CommitAsync();
 	}
 
 	public async Task ToggleDraftPinAsync(int id)

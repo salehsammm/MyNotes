@@ -32,6 +32,8 @@ public class AppDbContext : DbContext
 	{
         b.Entity<Playlist>().Property(p => p.Name).HasMaxLength(160);
         b.Entity<Playlist>().HasIndex(p => p.Name).IsUnique();
+        b.Entity<PlaylistScene>().Property(p => p.Note).HasMaxLength(10000);
+        b.Entity<PlaylistScene>().ToTable(t => t.HasCheckConstraint("CK_PlaylistScene_Position", "[Position] > 0"));
         b.Entity<PlaylistScene>().HasKey(p => new { p.PlaylistId, p.SceneId });
         b.Entity<PlaylistScene>().HasOne(p => p.Playlist).WithMany(p => p.Scenes)
             .HasForeignKey(p => p.PlaylistId).OnDelete(DeleteBehavior.Cascade);

@@ -1,0 +1,71 @@
+// Run with Playwright against a disposable host/database only. Creates playlist and scene fixtures.
+// Set MYNOTES_TEST_URL and MYNOTES_TEST_PASSWORD. Screenshots are written beside the script.
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+ const page=await browser.newPage({viewport:{width:1440,height:1100}}); const errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ const base=process.env.MYNOTES_TEST_URL;
+ if (!base || !process.env.MYNOTES_TEST_PASSWORD) throw new Error('Set MYNOTES_TEST_URL and MYNOTES_TEST_PASSWORD for a disposable test host.');
+ const region=name=>page.getByRole('region',{name,exact:true});
+ const row=(playlist,title)=>region(playlist).locator('.playlist-entry').filter({has:page.getByRole('link',{name:title,exact:true})});
+ async function order(playlist,titles,positions){
+  await page.waitForFunction(({playlist,titles,positions})=>{
+   const section=[...document.querySelectorAll('section')].find(e=>e.getAttribute('aria-label')===playlist);
+   if(!section)return false; const rows=[...section.querySelectorAll('.playlist-entry')];
+   return JSON.stringify(rows.map(r=>r.querySelector('.playlist-scene-title').textContent.trim()))===JSON.stringify(titles)
+    && (!positions||JSON.stringify(rows.map(r=>Number(r.dataset.position)))===JSON.stringify(positions));
+  },{playlist,titles,positions});
+ }
+ async function createScene(title,playlists){
+  await page.goto(base+'/moviereview/scenes/new'); await page.locator('#sceneTitle').fill(title);
+  if(playlists.length){await page.getByRole('button',{name:/Add to playlist/}).click(); for(const p of playlists)await page.getByLabel(p,{exact:true}).check(); await page.getByRole('button',{name:'Done',exact:true}).click();}
+  await page.getByRole('button',{name:'Save draft',exact:true}).click(); await page.waitForURL('**/moviereview/scenes');
+ }
+ try{
+  await page.goto(base+'/moviereview/playlists'); await page.waitForURL('**/private?**');
+  await page.locator('#password').fill(process.env.MYNOTES_TEST_PASSWORD);
+  await page.getByRole('button',{name:'Unlock',exact:true}).click();
+  for(const name of ['Weekend','Others']){await page.getByLabel('Playlist name',{exact:true}).fill(name); await page.getByRole('button',{name:'Create playlist',exact:true}).click();await region(name).waitFor();}
+  await createScene('Zulu',['Weekend','Others']); await createScene('Alpha',['Weekend']); await createScene('Middle',[]);
+  await page.goto(base+'/moviereview/playlists');
+  await region('Weekend').getByRole('combobox').selectOption({label:'Middle (Draft)'}); await region('Weekend').getByRole('button',{name:'Add scene',exact:true}).click();
+  await order('Weekend',['Zulu','Alpha','Middle'],[1,2,3]);
+  await row('Weekend','Zulu').locator('summary').click();
+  const note='Remember this scene\n<plain text> only in Weekend';
+  await row('Weekend','Zulu').getByRole('textbox').fill(note); await row('Weekend','Zulu').getByRole('button',{name:'Save note',exact:true}).click();
+  await row('Weekend','Zulu').locator('.playlist-note').getByText(note,{exact:true}).waitFor();
+  await row('Others','Zulu').locator('summary').click(); await row('Others','Zulu').getByRole('textbox').fill('A separate note'); await row('Others','Zulu').getByRole('button',{name:'Save note',exact:true}).click();
+  await row('Others','Zulu').locator('.playlist-note').getByText('A separate note',{exact:true}).waitFor();
+  await row('Weekend','Zulu').getByRole('button',{name:'Move Zulu down',exact:true}).click();
+  await order('Weekend',['Alpha','Zulu','Middle'],[1,2,3]);
+  await row('Weekend','Zulu').locator('summary').click();
+  await row('Others','Zulu').locator('summary').click();
+  await row('Weekend','Middle').getByRole('button',{name:'Drag Middle to reorder',exact:true}).dragTo(row('Weekend','Alpha'),{steps:20,targetPosition:{x:100,y:20}});
+  await order('Weekend',['Middle','Alpha','Zulu'],[1,2,3]);
+  console.log('Drag/drop verified');
+  await page.reload(); await order('Weekend',['Middle','Alpha','Zulu'],[1,2,3]);
+  assert.equal(await row('Weekend','Zulu').locator('.playlist-note').innerText(),note);
+  assert.equal(await row('Others','Zulu').locator('.playlist-note').innerText(),'A separate note');
+  await row('Weekend','Zulu').getByRole('link',{name:'Edit',exact:true}).click();
+  await page.getByRole('button',{name:'Save draft',exact:true}).click(); await page.waitForURL('**/moviereview/scenes');
+  await page.goto(base+'/moviereview/playlists'); await order('Weekend',['Middle','Alpha','Zulu'],[1,2,3]);
+  assert.equal(await row('Weekend','Zulu').locator('.playlist-note').innerText(),note);
+  await row('Weekend','Alpha').getByRole('button',{name:'Remove Alpha from Weekend',exact:true}).click(); await order('Weekend',['Middle','Zulu'],[1,3]);
+  await createScene('Fourth',['Weekend']); await page.goto(base+'/moviereview/playlists'); await order('Weekend',['Middle','Zulu','Fourth'],[1,3,4]);
+  await row('Weekend','Zulu').locator('summary').click(); await row('Weekend','Zulu').getByRole('textbox').fill('Unsaved draft');
+  await row('Weekend','Fourth').getByRole('button',{name:'Move Fourth up',exact:true}).click(); await order('Weekend',['Middle','Fourth','Zulu'],[1,2,3]);
+  assert.equal(await row('Weekend','Zulu').getByRole('textbox').inputValue(),'Unsaved draft');
+  await row('Weekend','Zulu').getByRole('button',{name:'Reset',exact:true}).click(); assert.equal(await row('Weekend','Zulu').getByRole('textbox').inputValue(),note);
+  await page.screenshot({path:__dirname+'/desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await row('Weekend','Fourth').getByRole('button',{name:'Move Fourth up',exact:true}).click(); await order('Weekend',['Fourth','Middle','Zulu'],[1,2,3]);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:__dirname+'/mobile.png',fullPage:true});
+  assert.deepEqual(errors,[]);
+  console.log('PASS: Release UI append order through both flows, drag/drop, arrows, persistence, independent multiline notes, scene-save preservation, max+1 after gap, unsaved note protection/reset and mobile reordering/layout.');
+ }catch(e){await page.screenshot({path:__dirname+'/failure.png',fullPage:true}); console.error((await page.locator('body').innerText()).slice(-4500));throw e;}
+ finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1)});
+

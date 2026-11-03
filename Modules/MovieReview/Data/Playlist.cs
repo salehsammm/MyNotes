@@ -12,5 +12,7 @@ public class PlaylistScene
     public int PlaylistId { get; set; }
     public Playlist Playlist { get; set; } = null!;
     public int SceneId { get; set; }
+    public int Position { get; set; }
+    public string Note { get; set; } = "";
     public Scene Scene { get; set; } = null!;
 }

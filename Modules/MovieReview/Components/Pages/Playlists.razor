@@ -5,12 +5,15 @@
 @inject PlaylistService PlaylistsService
 @inject SceneService SceneService
 @inject ILogger<Playlists> Logger
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Playlists - MovieReviews</PageTitle>
 <div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / PLAYLISTS</div><h1>Playlists</h1><p>Group scenes into your own collections.</p></div></div>
+@if (_notice.Length > 0) { <p class="text-success" role="status" aria-live="polite">@_notice</p> }
 @if (_busy) { <span hidden data-app-busy="Loading or saving playlists..."></span> }
 @if (_error is not null) { <div class="alert alert-danger" role="alert">@_error</div><button class="btn btn-secondary mb-3" @onclick="Load">Reload playlists</button> }
-<fieldset disabled="@_busy">
+<fieldset disabled="@_busy" @ref="_playlistRoot">
     <section class="card p-3 mb-4" aria-label="Create playlist">
         <h3>New playlist</h3>
         <form @onsubmit="Create" @onsubmit:preventDefault>
@@ -22,7 +25,7 @@
     <p class="text-muted">@_playlists.Count playlist(s)</p>
     @foreach (var playlist in _playlists)
     {
-        <section class="card p-3 mb-3" @key="playlist.Id" aria-label="@playlist.Name">
+        <section class="card p-3 mb-3" @key="playlist.Id" aria-label="@playlist.Name" data-playlist-id="@playlist.Id">
             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
                 <h3 class="me-auto mb-0">@playlist.Name <small class="text-muted">(@playlist.Scenes.Count)</small></h3>
                 <button class="btn btn-outline-secondary" @onclick="() => BeginRename(playlist)">Rename</button>
@@ -53,17 +56,49 @@
                 <button class="btn btn-outline-primary" disabled="@(_sceneIds[playlist.Id] == 0)" @onclick="() => AddScene(playlist.Id)">Add scene</button>
             </div>
             @if (playlist.Scenes.Count == 0) { <p class="text-muted">This playlist is empty.</p> }
-            <ul class="list-group list-group-flush">
-                @foreach (var entry in playlist.Scenes.OrderBy(s => s.Scene.Title))
+            @if (playlist.Scenes.Count > 1)
+            {
+                <p class="playlist-hint">Drag the grip to reorder, or use the arrow buttons. Changes save immediately.</p>
+            }
+            <ol class="playlist-scenes" aria-label="Scene order in @playlist.Name">
+                @{ var entries = playlist.Scenes.OrderBy(s => s.Position).ThenBy(s => s.SceneId).ToList(); }
+                @for (var index = 0; index < entries.Count; index++)
                 {
-                    <li class="list-group-item d-flex gap-2 align-items-center" @key="entry.SceneId">
-                        <a class="me-auto" href="/moviereview/scenes/@entry.SceneId/view">@entry.Scene.Title</a>
-                        @if (entry.Scene.IsDraft) { <span class="badge bg-secondary">Draft</span> }
-                        <a href="/moviereview/scenes/@entry.SceneId">Edit</a>
-                        <button class="btn btn-sm btn-outline-danger" aria-label="Remove @entry.Scene.Title from @playlist.Name" @onclick="() => RemoveScene(playlist.Id, entry.SceneId)">Remove</button>
+                    var entry = entries[index];
+                    var targetPosition = index + 1;
+                    <li class="playlist-entry" @key="entry.SceneId" data-scene-id="@entry.SceneId" data-position="@entry.Position">
+                        <div class="playlist-entry-heading">
+                            <button type="button" class="playlist-grip" draggable="true" disabled="@_busy"
+                                    aria-label="Drag @entry.Scene.Title to reorder" title="Drag to reorder">&#8942;&#8942;</button>
+                            <span class="playlist-position" title="Playlist order">@entry.Position</span>
+                            <a class="playlist-scene-title" href="/moviereview/scenes/@entry.SceneId/view">@entry.Scene.Title</a>
+                            @if (entry.Scene.IsDraft) { <span class="badge bg-secondary">Draft</span> }
+                            <div class="playlist-entry-actions">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(index == 0)"
+                                        aria-label="Move @entry.Scene.Title up" title="Move up"
+                                        @onclick="() => Move(playlist.Id, entry.SceneId, targetPosition - 1)">&#8593;</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(index == entries.Count - 1)"
+                                        aria-label="Move @entry.Scene.Title down" title="Move down"
+                                        @onclick="() => Move(playlist.Id, entry.SceneId, targetPosition + 1)">&#8595;</button>
+                                <a class="btn btn-sm btn-outline-secondary" href="/moviereview/scenes/@entry.SceneId">Edit</a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Remove @entry.Scene.Title from @playlist.Name" @onclick="() => RemoveScene(playlist.Id, entry.SceneId)">Remove</button>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(entry.Note)) { <p class="playlist-note">@entry.Note</p> }
+                        <details class="playlist-note-editor">
+                            <summary>@(string.IsNullOrEmpty(entry.Note) ? "Add a note" : "Edit note")</summary>
+                            <label class="visually-hidden" for="note-@playlist.Id-@entry.SceneId">Note for @entry.Scene.Title in @playlist.Name</label>
+                            <textarea id="note-@playlist.Id-@entry.SceneId" class="form-control mt-2" rows="3" maxlength="10000"
+                                      placeholder="Your note for this scene in this playlist..." @bind="_notes[(playlist.Id, entry.SceneId)]" @bind:event="oninput"></textarea>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-primary" @onclick="() => SaveNote(playlist.Id, entry.SceneId)">Save note</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _notes[(playlist.Id, entry.SceneId)] = entry.Note">Reset</button>
+                                <small class="text-muted">Only for this playlist</small>
+                            </div>
+                        </details>
                     </li>
                 }
-            </ul>
+            </ol>
         </section>
     }
 </fieldset>
@@ -75,6 +110,11 @@
     private Dictionary<int, string> _search = new();
     private string _name = "", _renameName = "";
     private string? _error;
+    private string _notice = "";
+    private Dictionary<(int PlaylistId, int SceneId), string> _notes = new();
+    private ElementReference _playlistRoot;
+    private IJSObjectReference? _orderModule;
+    private DotNetObjectReference<Playlists>? _orderReference;
     private int _renameId, _deleteId;
     private bool _busy;
     protected override Task OnInitializedAsync() => Load();
@@ -85,6 +125,10 @@
         var playlists = await PlaylistsService.GetAllAsync();
         var scenes = await SceneService.GetAllAsync();
         foreach (var p in playlists) { _sceneIds.TryAdd(p.Id, 0); _search.TryAdd(p.Id, ""); }
+        foreach (var playlist in playlists)
+            foreach (var entry in playlist.Scenes) _notes.TryAdd((playlist.Id, entry.SceneId), entry.Note);
+        var currentKeys = playlists.SelectMany(p => p.Scenes.Select(s => (p.Id, s.SceneId))).ToHashSet();
+        foreach (var key in _notes.Keys.Where(k => !currentKeys.Contains(k)).ToList()) _notes.Remove(key);
         _playlists = playlists;
         _scenes = scenes;
     }
@@ -93,11 +137,46 @@
         if (_busy) return;
         _busy = true;
         _error = null;
+        _notice = "";
         try { await action(); await Refresh(); }
         catch (InvalidOperationException ex) { _error = ex.Message; }
         catch (Exception ex) { Logger.LogError(ex, "Playlist operation failed"); _error = "Could not load or save playlists. Try again, or unlock the private area if your session expired."; }
         finally { _busy = false; }
     }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _orderModule = await JS.InvokeAsync<IJSObjectReference>("import", "/moviereview/js/playlist-order.js");
+        _orderReference = DotNetObjectReference.Create(this);
+        await _orderModule.InvokeVoidAsync("attach", _playlistRoot, _orderReference);
+    }
+    [JSInvokable]
+    public async Task ReorderScene(int playlistId, int sceneId, int position)
+    {
+        var operation = Move(playlistId, sceneId, position);
+        await InvokeAsync(StateHasChanged);
+        await operation;
+        await InvokeAsync(StateHasChanged);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (_orderModule is not null)
+        {
+            try { await _orderModule.InvokeVoidAsync("detach", _playlistRoot); await _orderModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        _orderReference?.Dispose();
+    }
+    private Task Move(int id, int sceneId, int position) => Run(async () =>
+    {
+        await PlaylistsService.MoveSceneAsync(id, sceneId, position);
+        _notice = $"Scene moved to position {position}.";
+    });
+    private Task SaveNote(int id, int sceneId) => Run(async () =>
+    {
+        await PlaylistsService.SaveNoteAsync(id, sceneId, _notes[(id, sceneId)]);
+        _notice = "Playlist note saved.";
+    });
     private Task Load() => Run(() => Task.CompletedTask);
     private Task Create() => Run(async () => { await PlaylistsService.CreateAsync(_name); _name = ""; });
     private void BeginRename(Playlist p) { _renameId = p.Id; _renameName = p.Name; }

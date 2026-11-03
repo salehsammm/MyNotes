@@ -2,6 +2,7 @@
 // Creates and drops only a uniquely named verification database; never uses the live database.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using MovieReviews.Data;
 using MovieReviews.Services;
 
@@ -17,7 +18,19 @@ async Task Reject(Func<Task> action)
 await using var db = await factory.CreateDbContextAsync();
 try
 {
+    await db.GetService<IMigrator>().MigrateAsync("20261103102918_AddScenePlaylists");
+    var oldPlaylist = new Playlist { Name = "Upgrade fixture" };
+    var oldZ = new Scene { Title = "Z upgrade", IsDraft = true };
+    var oldA = new Scene { Title = "A upgrade", IsDraft = true };
+    db.AddRange(oldPlaylist, oldZ, oldA);
+    await db.SaveChangesAsync();
+    await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO PlaylistScenes (PlaylistId, SceneId) VALUES ({oldPlaylist.Id}, {oldZ.Id}), ({oldPlaylist.Id}, {oldA.Id})");
     await db.Database.MigrateAsync();
+    var upgrade = await db.PlaylistScenes.AsNoTracking().Where(p => p.PlaylistId == oldPlaylist.Id).OrderBy(p => p.Position).ToListAsync();
+    Check(upgrade.Select(p => p.SceneId).SequenceEqual(new[] { oldA.Id, oldZ.Id }) && upgrade.Select(p => p.Position).SequenceEqual(new[] { 1, 2 }), "Existing entries were not backfilled in title order");
+    await db.Playlists.Where(p => p.Id == oldPlaylist.Id).ExecuteDeleteAsync();
+    await db.Scenes.Where(p => p.Id == oldA.Id || p.Id == oldZ.Id).ExecuteDeleteAsync();
+    db.ChangeTracker.Clear();
     Check(!db.Database.HasPendingModelChanges(), "Model/snapshot mismatch");
     var playlists = new PlaylistService(factory);
     var scenes = new SceneService(factory);
@@ -31,6 +44,7 @@ try
     var scene = new Scene { Title = "Disposable scene", IsDraft = true };
     await scenes.AddAsync(scene, new[] { first.Id, first.Id, second.Id });
     Check(await db.PlaylistScenes.CountAsync() == 2, "New-scene multi-playlist save or deduplication failed");
+    Check((await db.PlaylistScenes.AsNoTracking().ToListAsync()).All(p => p.Position == 1), "First membership must have order 1");
     await playlists.AddSceneAsync(first.Id, scene.Id);
     Check(await db.PlaylistScenes.CountAsync() == 2, "Duplicate membership accepted");
     scene.Title = "Updated scene";
@@ -42,6 +56,40 @@ try
     await Reject(() => scenes.AddAsync(new Scene { Title = "Must not exist" }, new[] { int.MaxValue }));
     Check(await db.Scenes.CountAsync() == 1, "Invalid membership persisted new scene");
     await Reject(() => playlists.AddSceneAsync(first.Id, int.MaxValue));
+    await playlists.SaveNoteAsync(second.Id, scene.Id, "Line 1\nLine 2 <plain text>");
+    await scenes.UpdateAsync((await scenes.GetAsync(scene.Id))!, new[] { second.Id });
+    Check((await db.PlaylistScenes.AsNoTracking().SingleAsync()).Note == "Line 1\nLine 2 <plain text>", "Scene save lost playlist note");
+    var extra = new Scene { Title = "Extra scene", IsDraft = true };
+    var last = new Scene { Title = "Last scene", IsDraft = true };
+    await scenes.AddAsync(extra, new[] { second.Id });
+    await scenes.AddAsync(last);
+    await playlists.AddSceneAsync(second.Id, last.Id);
+    var ordered = (await playlists.GetAllAsync()).Single(p => p.Id == second.Id).Scenes.OrderBy(p => p.Position).ToList();
+    Check(ordered.Select(p => p.Position).SequenceEqual(new[] { 1, 2, 3 }), "Append order wrong");
+    await playlists.MoveSceneAsync(second.Id, last.Id, 1);
+    ordered = (await playlists.GetAllAsync()).Single(p => p.Id == second.Id).Scenes.OrderBy(p => p.Position).ToList();
+    Check(ordered.Select(p => p.SceneId).SequenceEqual(new[] { last.Id, scene.Id, extra.Id }), "Move to first failed");
+    Check(ordered.Single(p => p.SceneId == scene.Id).Note.Contains("Line 2"), "Move lost note");
+    await playlists.MoveSceneAsync(second.Id, last.Id, 3);
+    await Reject(() => playlists.MoveSceneAsync(second.Id, scene.Id, 0));
+    await Reject(() => playlists.SaveNoteAsync(second.Id, scene.Id, new string('x', 10001)));
+    await playlists.RemoveSceneAsync(second.Id, extra.Id);
+    var appended = new Scene { Title = "Append after gap", IsDraft = true };
+    await scenes.AddAsync(appended, new[] { second.Id });
+    Check((await db.PlaylistScenes.AsNoTracking().SingleAsync(p => p.SceneId == appended.Id)).Position == 4, "Editor append did not use max+1 after removal");
+    await playlists.AddSceneAsync(first.Id, scene.Id);
+    await playlists.SaveNoteAsync(first.Id, scene.Id, "Different playlist note");
+    Check((await db.PlaylistScenes.AsNoTracking().SingleAsync(p => p.PlaylistId == second.Id && p.SceneId == scene.Id)).Note.StartsWith("Line 1"), "Notes leaked across playlists");
+    await playlists.RemoveSceneAsync(first.Id, scene.Id);
+    var concurrentA = new Scene { Title = "Concurrent A" };
+    var concurrentB = new Scene { Title = "Concurrent B" };
+    await scenes.AddAsync(concurrentA); await scenes.AddAsync(concurrentB);
+    await Task.WhenAll(playlists.AddSceneAsync(second.Id, concurrentA.Id), playlists.AddSceneAsync(second.Id, concurrentB.Id));
+    var concurrent = await db.PlaylistScenes.AsNoTracking().Where(p => p.PlaylistId == second.Id).ToListAsync();
+    Check(concurrent.Select(p => p.Position).Distinct().Count() == concurrent.Count && concurrent.Max(p => p.Position) == 6, "Concurrent append reused order");
+    await playlists.SaveNoteAsync(second.Id, scene.Id, "");
+    Check((await db.PlaylistScenes.AsNoTracking().SingleAsync(p => p.PlaylistId == second.Id && p.SceneId == scene.Id)).Note == "", "Clear note failed");
+    foreach (var id in new[] { extra.Id, last.Id, appended.Id, concurrentA.Id, concurrentB.Id }) await scenes.DeleteAsync(id);
     await playlists.RenameAsync(second.Id, "Renamed");
     Check((await playlists.GetAllAsync()).Single(p => p.Id == second.Id).Name == "Renamed", "Rename failed");
     await playlists.RemoveSceneAsync(second.Id, scene.Id);
@@ -52,6 +100,6 @@ try
     await playlists.AddSceneAsync(second.Id, scene.Id);
     await scenes.DeleteAsync(scene.Id);
     Check(await db.PlaylistScenes.CountAsync() == 0 && await db.Playlists.CountAsync() == 1, "Scene cascade failed");
-    Console.WriteLine("PASS: migrations/snapshot, validation, duplicate names/memberships, new/existing scene saves, rollback, rename, removal and both cascade directions.");
+    Console.WriteLine("PASS: migrations/snapshot, validation, duplicate names/memberships, new/existing scene saves, rollback, upgrade backfill, max+1 append, reorder, isolated notes, concurrent append, rename, removal and both cascade directions.");
 }
 finally { await db.Database.EnsureDeletedAsync(); Console.WriteLine("Disposable database removed."); }

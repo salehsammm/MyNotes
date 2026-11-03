@@ -452,11 +452,22 @@ namespace MovieReviews.Migrations
                     b.Property<int>("SceneId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
                     b.HasKey("PlaylistId", "SceneId");
 
                     b.HasIndex("SceneId");
 
-                    b.ToTable("PlaylistScenes");
+                    b.ToTable("PlaylistScenes", t =>
+                        {
+                            t.HasCheckConstraint("CK_PlaylistScene_Position", "[Position] > 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieReviews.Data.ResearchDoc", b =>
