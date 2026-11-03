@@ -74,6 +74,7 @@
                             <button type="button" class="filter @(kindFilter == choice ? "active" : "")" @onclick="() => FilterKind(choice)" disabled="@busy">@choice</button>
                         }
                     </div>
+                    <button type="button" class="filter @(favoritesOnly ? "active" : "")" aria-pressed="@(favoritesOnly ? "true" : "false")" @onclick="FilterFavorites" disabled="@busy">★ Favorites</button>
                     <details class="notes-search-options">
                         <summary>Search options</summary>
                         <div class="form-grid">
@@ -91,7 +92,7 @@
                     @foreach (var note in notes)
                     {
                         <button class="library-item @(selectedId == note.Id ? "selected" : "")" @onclick="() => RequestSelect(note.Id)" disabled="@busy" @key="note.Id">
-                            <span class="item-icon">@(note.Kind == PersonalNoteKind.Diary ? "◷" : "▤")</span>
+                            <span class="item-icon">@if (note.IsFavorite) { <span class="favorite-star" aria-label="Favorite">★</span> } else { @(note.Kind == PersonalNoteKind.Diary ? "◷" : "▤") }</span>
                             <span class="item-main"><strong>@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(EffectiveCategory(note) ?? "Uncategorized")</small>@if (note.NoteGroup is not null) { <small>@note.NoteGroup.Name</small> }<span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
                         </button>
                     }
@@ -110,6 +111,7 @@
                     <fieldset class="note-fieldset" disabled="@busy">
                         <div class="form-grid">
                             <div class="field wide"><label for="note-title">Title</label><InputText id="note-title" @bind-Value="form.Title" @oninput="MarkDirty" dir="auto" /><ValidationMessage For="() => form.Title" /></div>
+                            <div class="field wide"><button type="button" class="button ghost note-favorite" aria-pressed="@(form.IsFavorite ? "true" : "false")" @onclick="ToggleFavorite"><span class="@(form.IsFavorite ? "favorite-star" : "")" aria-hidden="true">@(form.IsFavorite ? "★" : "☆")</span> @(form.IsFavorite ? "Favorite" : "Mark as favorite")</button><small>Worth reading again · saved with this @(form.Kind == PersonalNoteKind.Diary ? "diary entry" : "note")</small></div>
                             <div class="field"><label for="note-kind">Type</label><InputSelect id="note-kind" @bind-Value="form.Kind"><option value="Note">Note</option><option value="Diary">Diary</option></InputSelect></div>
                             <div class="field"><label for="note-date">@(form.Kind == PersonalNoteKind.Diary ? "Diary date" : "Note date")</label><InputDate id="note-date" @bind-Value="form.NoteDate" /><ValidationMessage For="() => form.NoteDate" /></div>
                             <div class="field wide"><label for="note-group">Note group <span>optional</span></label><InputSelect id="note-group" @bind-Value="form.NoteGroupId" @bind-Value:after="GroupChanged"><option value="">No group</option>@foreach (var group in groups) { <option value="@group.Id">@group.Name</option> }</InputSelect></div>

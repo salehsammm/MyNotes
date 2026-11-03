@@ -26,6 +26,7 @@ public partial class PersonalNotes
     private string matchMode = "all";
     private string searchScope = "all";
     private string kindFilter = "All";
+    private bool favoritesOnly;
     private string categoryFilter = "";
     private DateOnly? fromDate;
     private DateOnly? toDate;
@@ -106,12 +107,15 @@ public partial class PersonalNotes
 
     private Task Search() { resultLimit = 50; return Run(RefreshResults); }
     private Task FilterKind(string kind) { kindFilter = kind; return Search(); }
+    private Task FilterFavorites() { favoritesOnly = !favoritesOnly; return Search(); }
+    private void ToggleFavorite() { form.IsFavorite = !form.IsFavorite; dirty = true; }
     private Task LoadMore() { resultLimit += 50; return Run(RefreshResults); }
     private Task ClearSearch()
     {
         searchText = categoryFilter = "";
         groupFilter = 0;
         kindFilter = "All";
+        favoritesOnly = false;
         matchMode = searchScope = "all";
         fromDate = toDate = null;
         sortOrder = "date-desc";
@@ -131,6 +135,7 @@ public partial class PersonalNotes
         if (groupFilter == -1) query = query.Where(n => n.NoteGroupId == null);
         if (kindFilter == "Notes") query = query.Where(n => n.Kind == PersonalNoteKind.Note);
         if (kindFilter == "Diary") query = query.Where(n => n.Kind == PersonalNoteKind.Diary);
+        if (favoritesOnly) query = query.Where(n => n.IsFavorite);
         if (categoryFilter == "__none") query = query.Where(n => n.NoteGroupId != null ? n.NoteGroup!.Category == null : n.Category == null);
         else if (!string.IsNullOrEmpty(categoryFilter)) query = query.Where(n => (n.NoteGroupId != null ? n.NoteGroup!.Category : n.Category) == categoryFilter);
         if (fromDate is DateOnly first) query = query.Where(n => n.NoteDate >= first);
@@ -172,6 +177,7 @@ public partial class PersonalNotes
         if (note is null) { error = "This note no longer exists. Your writing is still here."; return; }
         note.Title = form.Title.Trim();
         note.Kind = form.Kind;
+        note.IsFavorite = form.IsFavorite;
         note.NoteDate = form.NoteDate;
         var category = string.IsNullOrWhiteSpace(form.Category) ? null : form.Category.Trim();
         note.NoteGroupId = group?.Id;

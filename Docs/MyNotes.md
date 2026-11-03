@@ -27,6 +27,8 @@ On 2026-10-06, the user-provided desktop note file was imported directly into th
 
 ## Personal notes and diary
 
+Notes and diary entries can be marked **★ Favorite** in the editor when they are worth reading again. The star is saved with **Save note / Save diary entry**, and unsaved star changes receive the same navigation protection as writing. Saved favorites show a star in the library. **★ Favorites** limits results to starred entries and combines with type, group, text, category, and date filters; **Reset** clears it. Existing entries start unstarred.
+
 `/journal/notes` is linked from the journal toolbar. Personal notes have a title, note date, optional custom category, and separate Details, My understanding & conclusion, and Summary sections. Diary entries start with today's date in the Asia/Tehran time zone and a suggested title; their freeform entry is prominent, with conclusion and summary optional. Multiple entries per day are allowed. Dates remain editable for past entries.
 
 Search combines all words, any word, or an exact phrase with section, type, category, and inclusive note-date filters. Sort by note date, most recent edit, or title; results load 50 at a time. Text is stored as Unicode without stripping paragraphs. Creation/edit timestamps are stored in UTC and displayed in Tehran time. Switching entries or leaving the page warns about unsaved changes; notes use explicit Save. This section has the same access as the media journal.

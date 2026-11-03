@@ -10,6 +10,7 @@ public class PersonalNote
     [Required, StringLength(200)]
     public string Title { get; set; } = "";
     public PersonalNoteKind Kind { get; set; } = PersonalNoteKind.Note;
+    public bool IsFavorite { get; set; }
     public DateOnly NoteDate { get; set; }
     [StringLength(100)]
     public string? Category { get; set; }

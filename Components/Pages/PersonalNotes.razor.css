@@ -1,0 +1,11 @@
+.favorite-star {
+    color: #a66b00;
+}
+
+.note-favorite {
+    align-self: flex-start;
+}
+
+.note-favorite[aria-pressed="true"] {
+    border-color: #a66b00;
+}
