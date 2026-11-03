@@ -15,6 +15,10 @@ Recently done is a compact disclosure that starts closed on each page load. Open
 
 Each Recently done entry has an Undo button. It reverses the final count increment for that exact occurrence (keeping earlier counts), clears its completion timestamp, and refreshes the checklist, missed tasks, and recent history. Past required occurrences return to Missed tasks; other occurrences can be viewed on their original date. The recent API includes `progressId` so Undo uses the existing progress decrement endpoint.
 
+Missed tasks has a **Done all** action with confirmation. It completes all currently missed required occurrences to their target counts in one save, excluding optional tasks, future/current occurrences, and obsolete one-time schedules. Each completion appears in Recently done and can be reopened there.
+
+Task creation and editing include an optional icon (movie, music, bookmark, TV/series, book, check, star, or exercise) and a custom background color with a live preview. These settings belong to the task and appear on daily, weekly, one-time, missed, and recently completed occurrences. Choose None or turn off Use custom color to restore the defaults. Text contrast adapts to the background. The API accepts an allowed icon name or null and a six-digit hex background color or null.
+
 The dashboard question preview shows up to four questions, prioritizing unanswered questions and filling any remaining slots with answered questions.
 
 ## Code map

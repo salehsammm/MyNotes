@@ -6,14 +6,17 @@ namespace BookmarkCounter.Services;
 public record ChecklistItemDto(
 	int Id, int ProgressId, string Title, string Recurrence,
 	int TargetCount, int CurrentCount, bool Completed, string PeriodStart,
-	bool IsOneTime, int RepeatEveryDays, string? FirstDueDate, bool IsOptional);
+	bool IsOneTime, int RepeatEveryDays, string? FirstDueDate, bool IsOptional,
+	string? Icon = null, string? BackgroundColor = null);
 
 public record RecentCompletionDto(int ProgressId, string Title, string Recurrence, string PeriodStart,
-	int CurrentCount, int TargetCount, DateTime CompletedAt);
+	int CurrentCount, int TargetCount, DateTime CompletedAt,
+	string? Icon, string? BackgroundColor);
 
 public record ChecklistRequest(string Title, RecurrenceType Recurrence, int TargetCount,
 	bool IsOneTime = false, DateOnly? ScheduledDate = null,
-	int RepeatEveryDays = 1, DateOnly? FirstDueDate = null, bool IsOptional = false);
+	int RepeatEveryDays = 1, DateOnly? FirstDueDate = null, bool IsOptional = false,
+	string? Icon = null, string? BackgroundColor = null);
 
 public class ChecklistRepository
 {
@@ -170,7 +173,7 @@ public class ChecklistRepository
 				item.TargetCount, cur, cur >= item.TargetCount,
 				periodStart.ToString("yyyy-MM-dd"), item.IsOneTime,
 				item.RepeatEveryDays, item.Recurrence == RecurrenceType.Daily && !item.IsOneTime
-					? FirstDue(item).ToString("yyyy-MM-dd") : null, item.IsOptional));
+					? FirstDue(item).ToString("yyyy-MM-dd") : null, item.IsOptional, item.Icon, item.BackgroundColor));
 		}
 		return result;
 	}
@@ -181,6 +184,8 @@ public class ChecklistRepository
 		var item = new ChecklistItem
 		{
 			Title = req.Title.Trim(),
+			Icon = req.Icon,
+			BackgroundColor = req.BackgroundColor,
 			Recurrence = req.Recurrence,
 			IsOneTime = req.IsOneTime,
 			IsOptional = req.IsOptional,
@@ -201,7 +206,7 @@ public class ChecklistRepository
 			item.Id, 0, item.Title, item.Recurrence.ToString(),
 			item.TargetCount, 0, false,
 			item.ScheduledPeriodStart?.ToString("yyyy-MM-dd") ?? "", item.IsOneTime,
-			item.RepeatEveryDays, item.FirstDueDate?.ToString("yyyy-MM-dd"), item.IsOptional);
+			item.RepeatEveryDays, item.FirstDueDate?.ToString("yyyy-MM-dd"), item.IsOptional, item.Icon, item.BackgroundColor);
 	}
 
 	public async Task<bool> UpdateAsync(int id, ChecklistRequest req)
@@ -210,6 +215,8 @@ public class ChecklistRepository
 		var item = await db.ChecklistItems.FirstOrDefaultAsync(i => i.Id == id);
 		if (item is null) return false;
 		item.Title = req.Title.Trim();
+		item.Icon = req.Icon;
+		item.BackgroundColor = req.BackgroundColor;
 		item.TargetCount = Math.Max(1, req.TargetCount);
 		item.IsOptional = req.IsOptional;
 		var wasOneTime = item.IsOneTime;
@@ -281,7 +288,7 @@ public class ChecklistRepository
 			.ToListAsync();
 		return rows.Select(p => new RecentCompletionDto(p.Id, p.Item.Title, p.Item.Recurrence.ToString(),
 			p.PeriodStart.ToString("yyyy-MM-dd"), p.CurrentCount, p.Item.TargetCount,
-			DateTime.SpecifyKind(p.CompletedAt!.Value, DateTimeKind.Utc))).ToList();
+			DateTime.SpecifyKind(p.CompletedAt!.Value, DateTimeKind.Utc), p.Item.Icon, p.Item.BackgroundColor)).ToList();
 	}
 
 	public async Task<List<ChecklistItemDto>> GetMissedAsync()
@@ -301,7 +308,29 @@ public class ChecklistRepository
 			p.Item.Recurrence.ToString(), p.Item.TargetCount, p.CurrentCount, false,
 			p.PeriodStart.ToString("yyyy-MM-dd"), p.Item.IsOneTime,
 			p.Item.RepeatEveryDays, p.Item.Recurrence == RecurrenceType.Daily && !p.Item.IsOneTime
-				? FirstDue(p.Item).ToString("yyyy-MM-dd") : null, p.Item.IsOptional)).ToList();
+				? FirstDue(p.Item).ToString("yyyy-MM-dd") : null, p.Item.IsOptional, p.Item.Icon, p.Item.BackgroundColor)).ToList();
+	}
+
+	public async Task<int> CompleteAllMissedAsync()
+	{
+		await EnsureRowsAsync();
+		await using var db = await _factory.CreateDbContextAsync();
+		var today = DateOnly.FromDateTime(DateTime.Now);
+		var thisWeek = WeekStart(today);
+		var rows = await db.ChecklistProgress.Include(p => p.Item)
+			.Where(p => p.Item.IsActive && !p.Item.IsOptional && p.CurrentCount < p.Item.TargetCount
+				&& (!p.Item.IsOneTime || p.Item.ScheduledPeriodStart == p.PeriodStart)
+				&& ((p.Item.Recurrence == RecurrenceType.Daily && p.PeriodStart < today)
+					|| (p.Item.Recurrence == RecurrenceType.Weekly && p.PeriodStart < thisWeek)))
+			.ToListAsync();
+		var completedAt = DateTime.UtcNow;
+		foreach (var row in rows)
+		{
+			row.CurrentCount = row.Item.TargetCount;
+			row.CompletedAt = completedAt;
+		}
+		await db.SaveChangesAsync();
+		return rows.Count;
 	}
 
 	private static DateOnly SchedulePeriod(ChecklistRequest req)
@@ -330,6 +359,6 @@ public class ChecklistRepository
 			row.CurrentCount >= row.Item.TargetCount,
 			row.PeriodStart.ToString("yyyy-MM-dd"), row.Item.IsOneTime,
 			row.Item.RepeatEveryDays, row.Item.Recurrence == RecurrenceType.Daily && !row.Item.IsOneTime
-				? FirstDue(row.Item).ToString("yyyy-MM-dd") : null, row.Item.IsOptional);
+				? FirstDue(row.Item).ToString("yyyy-MM-dd") : null, row.Item.IsOptional, row.Item.Icon, row.Item.BackgroundColor);
 	}
 }

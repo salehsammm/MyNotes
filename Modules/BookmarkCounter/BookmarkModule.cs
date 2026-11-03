@@ -69,6 +69,9 @@ public static class BookmarkModule
         group.MapGet("/api/checklist/missed", async (ChecklistRepository repo) =>
             Results.Ok(await repo.GetMissedAsync()));
 
+        group.MapPost("/api/checklist/missed/complete-all", async (ChecklistRepository repo) =>
+            Results.Ok(new { completed = await repo.CompleteAllMissedAsync() }));
+
         group.MapGet("/api/checklist/recent", async (ChecklistRepository repo, int? minutes) =>
             minutes is < 0 or > 525600 ? Results.BadRequest() :
             Results.Ok(await repo.GetRecentCompletionsAsync(minutes ?? 2880)));
@@ -110,6 +113,8 @@ public static class BookmarkModule
         !string.IsNullOrWhiteSpace(req.Title) && req.Title.Trim().Length <= 200
         && req.TargetCount is >= 1 and <= 999
         && req.RepeatEveryDays is >= 1 and <= 365
+        && (req.Icon is null or "movie" or "music" or "bookmark" or "tv" or "book" or "check" or "star" or "exercise")
+        && (req.BackgroundColor is null || System.Text.RegularExpressions.Regex.IsMatch(req.BackgroundColor, "^#[0-9a-fA-F]{6}$"))
         && Enum.IsDefined(req.Recurrence);
 
     private static bool ValidQuestionRequest(QuestionRequest req) =>

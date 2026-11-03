@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101416">
   <title>Overview · BookmarkCounter</title>
-  <link rel="stylesheet" href="/bookmarks/css/app.css?v=11">
-  <script src="/bookmarks/js/dashboard.js?v=12" defer></script>
+  <link rel="stylesheet" href="/bookmarks/css/app.css?v=12">
+  <script src="/bookmarks/js/dashboard.js?v=13" defer></script>
 </head>
 <body>
   <nav aria-label="MyNotes navigation" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/journal" style="color:#eee">MyNotes journal</a></nav>
@@ -71,7 +71,7 @@
           </section>
         </div>
         <section class="missed-panel" aria-labelledby="missedTitle">
-          <div class="missed-heading"><div><h3 id="missedTitle">Missed tasks</h3><p>Unfinished tasks from past days and weeks. You can still complete them here.</p></div><span class="progress-summary" id="missedSummary">—</span></div>
+          <div class="missed-heading"><div><h3 id="missedTitle">Missed tasks</h3><p>Unfinished tasks from past days and weeks. You can still complete them here.</p></div><div class="missed-controls"><span class="progress-summary" id="missedSummary">—</span><button type="button" class="recent-undo" id="completeAllMissed" disabled>Done all</button></div></div>
           <div class="missed-list" id="missedItems" aria-live="polite"></div>
         </section>
         <section class="questions-preview" aria-labelledby="questionsPreviewTitle">

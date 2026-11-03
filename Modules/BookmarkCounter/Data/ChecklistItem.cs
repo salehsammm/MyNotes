@@ -6,6 +6,8 @@ public class ChecklistItem
 {
 	public int Id { get; set; }
 	public string Title { get; set; } = "";
+	public string? Icon { get; set; }
+	public string? BackgroundColor { get; set; }
 	public RecurrenceType Recurrence { get; set; }
 	public bool IsOneTime { get; set; }
 	public bool IsOptional { get; set; }

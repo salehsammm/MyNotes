@@ -4,6 +4,19 @@ selectedDate.setHours(0, 0, 0, 0);
 let loadSequence = 0;
 let recentLoadSequence = 0;
 let toastTimer;
+let missedCount = 0;
+const taskIcons = { movie: '🎬', music: '🎵', bookmark: '🔖', tv: '📺', book: '📖', check: '✓', star: '⭐', exercise: '🏃' };
+
+function applyTaskAppearance(row, item) {
+  const color = item.backgroundColor;
+  if (/^#[0-9a-f]{6}$/i.test(color || '')) {
+    row.style.backgroundColor = color;
+    const rgb = color.slice(1).match(/../g).map(value => parseInt(value, 16) / 255)
+      .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+    row.style.setProperty('--task-ink', rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722 > .179 ? '#111111' : '#ffffff');
+    row.classList.add('custom-task-color');
+  }
+}
 
 function today() {
   const date = new Date();
@@ -120,6 +133,8 @@ async function loadRecent() {
       row.className = 'recent-item';
       const title = document.createElement('strong');
       title.textContent = item.title;
+      if (taskIcons[item.icon]) title.textContent = `${taskIcons[item.icon]} ${item.title}`;
+      applyTaskAppearance(row, item);
       const details = document.createElement('span');
       details.textContent = `${item.recurrence} · ${item.periodStart} · ${item.currentCount}/${item.targetCount}`;
       const time = document.createElement('time');
@@ -163,6 +178,8 @@ async function loadMissed() {
   const list = getElement('missedItems');
   try {
     const items = await request('/bookmarks/api/checklist/missed');
+    missedCount = items.length;
+    getElement('completeAllMissed').disabled = !missedCount;
     getElement('missedSummary').textContent = `${items.length} open`;
     list.replaceChildren();
     if (!items.length) {
@@ -171,6 +188,7 @@ async function loadMissed() {
     }
     items.forEach(item => list.append(renderItem(item, true)));
   } catch {
+    getElement('completeAllMissed').disabled = true;
     list.replaceChildren(emptyState('Could not load missed tasks', 'Try refreshing the page.'));
   }
 }
@@ -237,6 +255,14 @@ function renderItem(item, missed = false) {
   row.className = `item${item.completed ? ' complete' : ''}${item.isOptional ? ' optional' : ''}`;
   row.innerHTML = '<span class="completion-mark" aria-hidden="true">✓</span><div class="item-main"><div class="item-title-line"><div class="item-title"></div><span class="optional-badge" hidden>Optional</span></div><div class="item-subtitle"></div></div><div class="item-actions"><div class="stepper"><button class="minus" type="button">−</button><span></span><button class="plus" type="button">+</button></div><button class="more-button" type="button" aria-label="Item options" aria-expanded="false">⋯</button></div>';
   row.querySelector('.item-title').textContent = item.title;
+  if (taskIcons[item.icon]) {
+    const icon = document.createElement('span');
+    icon.className = 'task-icon';
+    icon.textContent = taskIcons[item.icon];
+    icon.setAttribute('aria-hidden', 'true');
+    row.querySelector('.item-title-line').prepend(icon);
+  }
+  applyTaskAppearance(row, item);
   row.querySelector('.optional-badge').hidden = !item.isOptional;
   const period = missed ? `${item.recurrence === 'Daily' ? 'Day' : 'Week of'} ${item.periodStart} · ` : '';
   const cadence = !item.isOneTime && item.recurrence === 'Daily' && item.repeatEveryDays > 1
@@ -285,8 +311,35 @@ function showForm(recurrence, item = null, row = null) {
   form.className = 'item-form';
   form.innerHTML = '<div><label for="itemTitle">Item</label><input id="itemTitle" name="title" type="text" maxlength="200" placeholder="e.g. Watch one saved video" required></div><div><label for="itemTarget">Goal</label><input id="itemTarget" name="target" type="number" min="1" max="999" required></div><label class="one-time-option"><input name="oneTime" type="checkbox"> One-time task</label><label class="one-time-option"><input name="optional" type="checkbox"> Optional task <small>(never appears in Missed tasks)</small></label><div class="repeat-field"><label for="repeatEveryDays">Repeat every (days)</label><input id="repeatEveryDays" name="repeatEveryDays" type="number" min="1" max="365" required></div><div class="first-due-field"><label for="firstDueDate">First due date</label><input id="firstDueDate" name="firstDueDate" type="date" required></div><div class="schedule-field" hidden><label for="scheduledDate">Scheduled date</label><input id="scheduledDate" name="scheduledDate" type="date"></div><p class="form-error" hidden></p><div class="form-actions"><button type="button" class="cancel">Cancel</button><button type="submit">Save item</button></div>';
   const title = form.elements.title;
+  const appearance = document.createElement('div');
+  appearance.className = 'task-appearance';
+  appearance.innerHTML = '<div><label for="taskIcon">Icon</label><select id="taskIcon" name="icon"><option value="">None</option></select></div><div><label for="taskColor">Background color</label><input id="taskColor" name="backgroundColor" type="color" value="#202729"><label class="one-time-option"><input type="checkbox" name="customColor"> Use custom color</label></div><div class="appearance-preview"></div>';
+  for (const [value, symbol] of Object.entries(taskIcons)) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = `${symbol} ${value === 'tv' ? 'TV / Series' : value[0].toUpperCase() + value.slice(1)}`;
+    appearance.querySelector('select').append(option);
+  }
+  form.querySelector('.one-time-option').before(appearance);
+  form.elements.icon.value = item?.icon || '';
+  form.elements.backgroundColor.value = item?.backgroundColor || '#202729';
+  form.elements.customColor.checked = Boolean(item?.backgroundColor);
+  const preview = appearance.querySelector('.appearance-preview');
+  const updatePreview = () => {
+    const icon = taskIcons[form.elements.icon.value] || '';
+    preview.textContent = `${icon} ${title.value.trim() || 'Task preview'}`.trim();
+    preview.removeAttribute('style');
+    preview.classList.remove('custom-task-color');
+    applyTaskAppearance(preview, { backgroundColor: form.elements.customColor.checked ? form.elements.backgroundColor.value : null });
+  };
+  appearance.addEventListener('input', event => {
+    if (event.target === form.elements.backgroundColor) form.elements.customColor.checked = true;
+    updatePreview();
+  });
+  title.addEventListener('input', updatePreview);
   const target = form.elements.target;
   title.value = item?.title || '';
+  updatePreview();
   target.value = item?.targetCount || 1;
   const oneTime = form.elements.oneTime;
   const scheduledDate = form.elements.scheduledDate;
@@ -325,7 +378,7 @@ function showForm(recurrence, item = null, row = null) {
     const submit = form.querySelector('[type=submit]');
     submit.disabled = true;
     try {
-      await request(item ? `/bookmarks/api/checklist/${item.id}` : '/bookmarks/api/checklist', { method: item ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: trimmed, recurrence, targetCount: goal, isOneTime: oneTime.checked, isOptional: form.elements.optional.checked, scheduledDate: oneTime.checked ? scheduledDate.value : null, repeatEveryDays: recurrence === 'Daily' && !oneTime.checked ? interval : 1, firstDueDate: recurrence === 'Daily' && !oneTime.checked ? firstDueDate.value : null }) });
+      await request(item ? `/bookmarks/api/checklist/${item.id}` : '/bookmarks/api/checklist', { method: item ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: trimmed, recurrence, targetCount: goal, isOneTime: oneTime.checked, isOptional: form.elements.optional.checked, scheduledDate: oneTime.checked ? scheduledDate.value : null, repeatEveryDays: recurrence === 'Daily' && !oneTime.checked ? interval : 1, firstDueDate: recurrence === 'Daily' && !oneTime.checked ? firstDueDate.value : null, icon: form.elements.icon.value || null, backgroundColor: form.elements.customColor.checked ? form.elements.backgroundColor.value : null }) });
       close();
       await loadChecklist();
       notify(item ? 'Item updated.' : oneTime.checked ? 'One-time task scheduled.' : 'Item added.');
@@ -362,6 +415,18 @@ document.addEventListener('click', event => {
   }
 });
 document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => showForm(button.dataset.add)));
+getElement('completeAllMissed').addEventListener('click', async () => {
+  if (!missedCount || !confirm(`Mark all ${missedCount} missed tasks as done? This fills every remaining count. You can undo individual completions in Recently done.`)) return;
+  const button = getElement('completeAllMissed');
+  button.disabled = true;
+  try {
+    const result = await request('/bookmarks/api/checklist/missed/complete-all', { method: 'POST' });
+    notify(`${result.completed} missed tasks completed.`);
+  } catch {
+    notify('Could not complete missed tasks. Please try again.', true);
+  }
+  await loadChecklist();
+});
 getElement('previousDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() - 1); loadChecklist(); });
 getElement('nextDay').addEventListener('click', () => { selectedDate.setDate(selectedDate.getDate() + 1); loadChecklist(); });
 getElement('jumpDate').addEventListener('change', event => { if (event.target.value) { selectedDate.setTime(new Date(`${event.target.value}T00:00:00`).getTime()); loadChecklist(); } });
