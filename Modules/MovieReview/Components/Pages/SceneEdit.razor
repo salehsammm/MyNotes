@@ -5,6 +5,7 @@
 @using MovieReviews.Services
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
+@inject PlaylistService PlaylistService
 @inject SceneService SceneService
 @inject PerformerService PerformerService
 @inject LookupService LookupService
@@ -44,6 +45,7 @@ else if (_scene is null)
 }
 else
 {
+    <PlaylistPicker @key="_scene" Selected="_playlistIds" Disabled="@IsBusy" />
     <EditForm Model="_scene" OnSubmit="SaveCurrent" FormName="sceneForm">
         <div class="scene-editor-status" role="status"><span class="scene-status @(_scene.IsDraft ? "scene-status-draft" : "scene-status-complete")">@(_scene.IsDraft ? "Draft" : "Complete")</span><span>@(_scene.IsDraft ? "Your notes can stay unfinished. Ratings are optional until you complete the review." : "This review is complete. You can move it back to drafts if you want to revisit it.")</span></div>
         @if (_scene.IsDraft)
@@ -558,6 +560,7 @@ else
 @code {
     [Parameter] public int Id { get; set; }
 
+    private HashSet<int> _playlistIds = new();
     private Scene? _scene;
     private bool _loading = true;
     private bool _saving;
@@ -628,6 +631,7 @@ else
         _loadError = null;
         try
         {
+            var playlistsTask = PlaylistService.GetAllAsync(includeSceneDetails: false);
             var performersTask = PerformerService.GetAllAsync(includeArchived: true);
             var studiosTask = StudioService.GetAllAsync();
             var skinTask = LookupService.GetSkinColorsAsync();
@@ -635,7 +639,7 @@ else
             var assTask = LookupService.GetAssSizesAsync();
             var bjTask = LookupService.GetBjTagsAsync();
             var sceneTask = Id == 0 ? Task.FromResult<Scene?>(new Scene { IsDraft = true }) : SceneService.GetAsync(Id);
-            await Task.WhenAll(performersTask, studiosTask, skinTask, boobsTask, assTask, bjTask, sceneTask);
+            await Task.WhenAll(playlistsTask, performersTask, studiosTask, skinTask, boobsTask, assTask, bjTask, sceneTask);
             _allPerformers = await performersTask;
             _studios = await studiosTask;
             _skinColors = await skinTask;
@@ -643,6 +647,7 @@ else
             _assSizes = await assTask;
             _bjTags = await bjTask;
             _scene = await sceneTask;
+            _playlistIds = (await playlistsTask).Where(p => p.Scenes.Any(s => s.SceneId == Id)).Select(p => p.Id).ToHashSet();
             // Older reviews could store Reverse on its own; keep that selection usable.
             if (_scene?.Positions.Contains(Position.Reverse) == true && !_scene.Positions.Contains(Position.Cowgirl))
                 _scene.Positions.Add(Position.Cowgirl);
@@ -663,6 +668,7 @@ else
     {
         if (firstRender && !_jsRegistered)
         {
+            await using var shortcutModule = await JS.InvokeAsync<IJSObjectReference>("import", "/moviereview/js/ctrl-s.js");
             _objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("ctrlS.register", "sceneEdit", _objRef, nameof(TriggerSave), nameof(TriggerEsc));
             _jsRegistered = true;
@@ -947,11 +953,16 @@ else
         try
         {
             if (_scene.Id == 0)
-                await SceneService.AddAsync(_scene);
+                await SceneService.AddAsync(_scene, _playlistIds);
             else
-                await SceneService.UpdateAsync(_scene);
+                await SceneService.UpdateAsync(_scene, _playlistIds);
             await JS.InvokeVoidAsync("appBusy.beginNavigation");
             Nav.NavigateTo(asDraft ? "/moviereview/scenes" : $"/moviereview/scenes/{_scene.Id}/export");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _scene.IsDraft = wasDraft;
+            _saveError = ex.Message;
         }
         catch (Exception ex)
         {

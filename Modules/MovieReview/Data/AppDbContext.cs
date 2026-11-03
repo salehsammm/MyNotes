@@ -6,6 +6,8 @@ public class AppDbContext : DbContext
 {
 	public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+	public DbSet<Playlist> Playlists => Set<Playlist>();
+    public DbSet<PlaylistScene> PlaylistScenes => Set<PlaylistScene>();
 	public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<ArchiveCollection> ArchiveCollections => Set<ArchiveCollection>();
     public DbSet<ArchiveItem> ArchiveItems => Set<ArchiveItem>();
@@ -28,6 +30,13 @@ public class AppDbContext : DbContext
 
 	protected override void OnModelCreating(ModelBuilder b)
 	{
+        b.Entity<Playlist>().Property(p => p.Name).HasMaxLength(160);
+        b.Entity<Playlist>().HasIndex(p => p.Name).IsUnique();
+        b.Entity<PlaylistScene>().HasKey(p => new { p.PlaylistId, p.SceneId });
+        b.Entity<PlaylistScene>().HasOne(p => p.Playlist).WithMany(p => p.Scenes)
+            .HasForeignKey(p => p.PlaylistId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<PlaylistScene>().HasOne(p => p.Scene).WithMany()
+            .HasForeignKey(p => p.SceneId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<GuidePicture>().Property(p => p.FileName).HasMaxLength(255);
         b.Entity<GuidePicture>().Property(p => p.ContentType).HasMaxLength(32);
         b.Entity<GuidePicture>().HasOne(p => p.Section).WithMany()

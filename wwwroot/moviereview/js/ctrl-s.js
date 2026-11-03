@@ -1,4 +1,4 @@
-﻿window.ctrlS = {
+window.ctrlS ??= {
     _handlers: new Map(),
     register: function (id, dotNetRef, saveMethod, escMethod) {
         this.unregister(id);

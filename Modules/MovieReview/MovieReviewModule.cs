@@ -13,6 +13,7 @@ public static class MovieReviewModule
         services.AddScoped<PerformerService>();
         services.AddScoped<LookupService>();
         services.AddScoped<SceneService>();
+        services.AddScoped<PlaylistService>();
         services.AddScoped<StudioService>();
         services.AddScoped<GuideService>();
         services.AddScoped<IdeaService>();

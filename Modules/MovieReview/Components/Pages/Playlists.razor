@@ -1,0 +1,108 @@
+@page "/moviereview/playlists"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject PlaylistService PlaylistsService
+@inject SceneService SceneService
+@inject ILogger<Playlists> Logger
+
+<PageTitle>Playlists - MovieReviews</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">YOUR COLLECTION / PLAYLISTS</div><h1>Playlists</h1><p>Group scenes into your own collections.</p></div></div>
+@if (_busy) { <span hidden data-app-busy="Loading or saving playlists..."></span> }
+@if (_error is not null) { <div class="alert alert-danger" role="alert">@_error</div><button class="btn btn-secondary mb-3" @onclick="Load">Reload playlists</button> }
+<fieldset disabled="@_busy">
+    <section class="card p-3 mb-4" aria-label="Create playlist">
+        <h3>New playlist</h3>
+        <form @onsubmit="Create" @onsubmit:preventDefault>
+            <label for="new-playlist-name">Playlist name</label>
+            <div class="d-flex gap-2"><input id="new-playlist-name" class="form-control" maxlength="160" @bind="_name" /><button type="submit" class="btn btn-primary">Create playlist</button></div>
+        </form>
+    </section>
+    @if (!_busy && _playlists.Count == 0) { <p>No playlists yet. Create one above or from a scene editor.</p> }
+    <p class="text-muted">@_playlists.Count playlist(s)</p>
+    @foreach (var playlist in _playlists)
+    {
+        <section class="card p-3 mb-3" @key="playlist.Id" aria-label="@playlist.Name">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <h3 class="me-auto mb-0">@playlist.Name <small class="text-muted">(@playlist.Scenes.Count)</small></h3>
+                <button class="btn btn-outline-secondary" @onclick="() => BeginRename(playlist)">Rename</button>
+                <button class="btn btn-outline-danger" @onclick="() => _deleteId = playlist.Id">Delete playlist</button>
+            </div>
+            @if (_renameId == playlist.Id)
+            {
+                <form class="d-flex gap-2 mb-3" @onsubmit="() => Rename(playlist.Id)" @onsubmit:preventDefault>
+                    <input class="form-control" aria-label="New playlist name" maxlength="160" @bind="_renameName" />
+                    <button class="btn btn-primary" type="submit">Save name</button>
+                    <button class="btn btn-secondary" type="button" @onclick="() => _renameId = 0">Cancel</button>
+                </form>
+            }
+            @if (_deleteId == playlist.Id)
+            {
+                <div class="alert alert-warning">Delete this playlist? Its scenes will stay in your collection.
+                    <button class="btn btn-danger ms-2" @onclick="() => Delete(playlist.Id)">Confirm delete</button>
+                    <button class="btn btn-secondary ms-2" @onclick="() => _deleteId = 0">Cancel</button>
+                </div>
+            }
+            <label for="scene-search-@playlist.Id">Find a scene to add</label>
+            <input id="scene-search-@playlist.Id" class="form-control mb-2" placeholder="Search scene titles..." @bind="_search[playlist.Id]" @bind:event="oninput" @bind:after="() => _sceneIds[playlist.Id] = 0" />
+            <div class="d-flex gap-2 mb-3">
+                <select class="form-select" aria-label="Scene for @playlist.Name" @bind="_sceneIds[playlist.Id]">
+                    <option value="0">Choose a scene</option>
+                    @foreach (var scene in AvailableScenes(playlist)) { <option value="@scene.Id">@scene.Title@(scene.IsDraft ? " (Draft)" : "")</option> }
+                </select>
+                <button class="btn btn-outline-primary" disabled="@(_sceneIds[playlist.Id] == 0)" @onclick="() => AddScene(playlist.Id)">Add scene</button>
+            </div>
+            @if (playlist.Scenes.Count == 0) { <p class="text-muted">This playlist is empty.</p> }
+            <ul class="list-group list-group-flush">
+                @foreach (var entry in playlist.Scenes.OrderBy(s => s.Scene.Title))
+                {
+                    <li class="list-group-item d-flex gap-2 align-items-center" @key="entry.SceneId">
+                        <a class="me-auto" href="/moviereview/scenes/@entry.SceneId/view">@entry.Scene.Title</a>
+                        @if (entry.Scene.IsDraft) { <span class="badge bg-secondary">Draft</span> }
+                        <a href="/moviereview/scenes/@entry.SceneId">Edit</a>
+                        <button class="btn btn-sm btn-outline-danger" aria-label="Remove @entry.Scene.Title from @playlist.Name" @onclick="() => RemoveScene(playlist.Id, entry.SceneId)">Remove</button>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</fieldset>
+
+@code {
+    private List<Playlist> _playlists = new();
+    private List<Scene> _scenes = new();
+    private Dictionary<int, int> _sceneIds = new();
+    private Dictionary<int, string> _search = new();
+    private string _name = "", _renameName = "";
+    private string? _error;
+    private int _renameId, _deleteId;
+    private bool _busy;
+    protected override Task OnInitializedAsync() => Load();
+    private IEnumerable<Scene> AvailableScenes(Playlist playlist) => _scenes.Where(s =>
+        s.Title.Contains(_search[playlist.Id], StringComparison.OrdinalIgnoreCase) && !playlist.Scenes.Any(p => p.SceneId == s.Id));
+    private async Task Refresh()
+    {
+        var playlists = await PlaylistsService.GetAllAsync();
+        var scenes = await SceneService.GetAllAsync();
+        foreach (var p in playlists) { _sceneIds.TryAdd(p.Id, 0); _search.TryAdd(p.Id, ""); }
+        _playlists = playlists;
+        _scenes = scenes;
+    }
+    private async Task Run(Func<Task> action)
+    {
+        if (_busy) return;
+        _busy = true;
+        _error = null;
+        try { await action(); await Refresh(); }
+        catch (InvalidOperationException ex) { _error = ex.Message; }
+        catch (Exception ex) { Logger.LogError(ex, "Playlist operation failed"); _error = "Could not load or save playlists. Try again, or unlock the private area if your session expired."; }
+        finally { _busy = false; }
+    }
+    private Task Load() => Run(() => Task.CompletedTask);
+    private Task Create() => Run(async () => { await PlaylistsService.CreateAsync(_name); _name = ""; });
+    private void BeginRename(Playlist p) { _renameId = p.Id; _renameName = p.Name; }
+    private Task Rename(int id) => Run(async () => { await PlaylistsService.RenameAsync(id, _renameName); _renameId = 0; });
+    private Task Delete(int id) => Run(async () => { await PlaylistsService.DeleteAsync(id); _deleteId = 0; });
+    private Task AddScene(int id) => Run(async () => { await PlaylistsService.AddSceneAsync(id, _sceneIds[id]); _sceneIds[id] = 0; });
+    private Task RemoveScene(int id, int sceneId) => Run(() => PlaylistsService.RemoveSceneAsync(id, sceneId));
+}

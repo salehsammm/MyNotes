@@ -1,0 +1,73 @@
+@using MovieReviews.Data
+@using MovieReviews.Services
+@inject PlaylistService Playlists
+@inject ILogger<PlaylistPicker> Logger
+
+@if (_busy) { <span hidden data-app-busy="Loading or saving playlists..."></span> }
+<button type="button" class="btn btn-outline-primary mb-2" disabled="@Disabled" @onclick="Open">Add to playlist (@Selected.Count)</button>
+@if (_open)
+{
+    <section class="card p-3 mb-3" aria-label="Add to playlist">
+        <h4>Scene playlists</h4>
+        <p class="text-muted">Selections apply when you save the scene. New playlists are created immediately.</p>
+        @if (_error is not null) { <div class="alert alert-danger" role="alert">@_error</div> }
+        <fieldset disabled="@(_busy || Disabled)">
+            @foreach (var playlist in _playlists)
+            {
+                <label class="d-block mb-2" @key="playlist.Id">
+                    <input type="checkbox" checked="@Selected.Contains(playlist.Id)" @onchange="e => Toggle(playlist.Id, e.Value is true)" /> @playlist.Name
+                </label>
+            }
+            @if (_playlists.Count == 0) { <p>No playlists yet. Create your first one below.</p> }
+            <label for="picker-playlist-name">New playlist name</label>
+            <div class="d-flex gap-2 mb-3">
+                <input id="picker-playlist-name" class="form-control" maxlength="160" @bind="_name" />
+                <button type="button" class="btn btn-primary" @onclick="Create">Create and select</button>
+            </div>
+            <button type="button" class="btn btn-secondary" @onclick="() => _open = false">Done</button>
+            <a class="ms-3" href="/moviereview/playlists" target="_blank" rel="noopener">Manage playlists</a>
+        </fieldset>
+    </section>
+}
+
+@code {
+    [Parameter] public HashSet<int> Selected { get; set; } = new();
+    [Parameter] public bool Disabled { get; set; }
+    private List<Playlist> _playlists = new();
+    private string _name = "";
+    private string? _error;
+    private bool _open, _busy;
+
+    private async Task Open()
+    {
+        if (_busy || Disabled) return;
+        _open = true;
+        _busy = true;
+        _error = null;
+        try
+        {
+            _playlists = await Playlists.GetAllAsync(includeSceneDetails: false);
+            Selected.IntersectWith(_playlists.Select(p => p.Id));
+        }
+        catch (Exception ex) { Logger.LogError(ex, "Failed to load playlists"); _error = "Could not load playlists. Try again."; }
+        finally { _busy = false; }
+    }
+    private void Toggle(int id, bool value) { if (value) Selected.Add(id); else Selected.Remove(id); }
+    private async Task Create()
+    {
+        if (_busy || Disabled) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var playlist = await Playlists.CreateAsync(_name);
+            _playlists.Add(playlist);
+            _playlists = _playlists.OrderBy(p => p.Name).ToList();
+            Selected.Add(playlist.Id);
+            _name = "";
+        }
+        catch (InvalidOperationException ex) { _error = ex.Message; }
+        catch (Exception ex) { Logger.LogError(ex, "Failed to create playlist"); _error = "Could not create the playlist. Try again."; }
+        finally { _busy = false; }
+    }
+}

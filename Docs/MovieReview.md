@@ -123,3 +123,9 @@ EF tooling uses `DesignTimeAppDbContextFactory` to read the same connection conf
 Enter through `/private`, which is not shown in public navigation. All pages import the `PrivateArea` authorization attribute. The host gates direct private URLs and assets, and overrides the module DbContext factory with `PrivateMovieDbContextFactory` to check session access before each database operation. Preserve these controls for new pages and services; a hidden link by itself does not enforce privacy.
 
 The module layout includes an antiforgery-protected **Lock private area** form and loads its keyboard shortcut script only inside the private module. The global public App component must not load this script. See root PROJECT.md for password hash storage, session expiry and server maintenance access.
+
+## Scene playlists
+
+`/moviereview/playlists` lists private playlists and their scene counts. Create or rename a playlist (1-160 characters, unique name), search for saved scenes to add, open their detail/edit pages, remove membership, or confirm deletion of a playlist. Deleting a playlist never deletes its scenes; deleting a scene removes its playlist memberships.
+
+The scene editor's **Add to playlist** button lets you select multiple playlists or **Create and select** a new one without leaving the editor. New playlists are created immediately; membership changes persist atomically with the scene when saving a draft or completed review. This also works for a scene that has not been saved yet. Existing memberships are preselected. A scene appears only once in each playlist. Playlists use the existing private authorization and session-protected database factory.

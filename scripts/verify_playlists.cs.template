@@ -1,0 +1,57 @@
+// Run from a disposable net9.0 console project referencing MyNotes.csproj.
+// Creates and drops only a uniquely named verification database; never uses the live database.
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using MovieReviews.Data;
+using MovieReviews.Services;
+
+var databaseName = "MyNotesPlaylistVerify_" + Guid.NewGuid().ToString("N");
+var factory = new PooledDbContextFactory<AppDbContext>(new DbContextOptionsBuilder<AppDbContext>()
+    .UseSqlServer($"Server=.\\MSSQLSERVER2;Database={databaseName};Trusted_Connection=True;TrustServerCertificate=True;").Options);
+void Check(bool result, string message) { if (!result) throw new Exception(message); }
+async Task Reject(Func<Task> action)
+{
+    try { await action(); } catch (InvalidOperationException) { return; }
+    throw new Exception("Expected validation rejection");
+}
+await using var db = await factory.CreateDbContextAsync();
+try
+{
+    await db.Database.MigrateAsync();
+    Check(!db.Database.HasPendingModelChanges(), "Model/snapshot mismatch");
+    var playlists = new PlaylistService(factory);
+    var scenes = new SceneService(factory);
+    await Reject(() => playlists.CreateAsync("  "));
+    await Reject(() => playlists.CreateAsync(new string('x', 161)));
+    var first = await playlists.CreateAsync("  First  ");
+    var second = await playlists.CreateAsync("Second");
+    Check(first.Name == "First", "Name not trimmed");
+    await Reject(() => playlists.CreateAsync("first"));
+    await Reject(() => playlists.RenameAsync(second.Id, "First"));
+    var scene = new Scene { Title = "Disposable scene", IsDraft = true };
+    await scenes.AddAsync(scene, new[] { first.Id, first.Id, second.Id });
+    Check(await db.PlaylistScenes.CountAsync() == 2, "New-scene multi-playlist save or deduplication failed");
+    await playlists.AddSceneAsync(first.Id, scene.Id);
+    Check(await db.PlaylistScenes.CountAsync() == 2, "Duplicate membership accepted");
+    scene.Title = "Updated scene";
+    await scenes.UpdateAsync(scene, new[] { second.Id });
+    Check(await db.PlaylistScenes.CountAsync() == 1, "Existing-scene membership update failed");
+    scene.Title = "Must not save";
+    await Reject(() => scenes.UpdateAsync(scene, new[] { int.MaxValue }));
+    Check((await scenes.GetAsync(scene.Id))!.Title == "Updated scene", "Invalid membership persisted scene edits");
+    await Reject(() => scenes.AddAsync(new Scene { Title = "Must not exist" }, new[] { int.MaxValue }));
+    Check(await db.Scenes.CountAsync() == 1, "Invalid membership persisted new scene");
+    await Reject(() => playlists.AddSceneAsync(first.Id, int.MaxValue));
+    await playlists.RenameAsync(second.Id, "Renamed");
+    Check((await playlists.GetAllAsync()).Single(p => p.Id == second.Id).Name == "Renamed", "Rename failed");
+    await playlists.RemoveSceneAsync(second.Id, scene.Id);
+    Check(await db.PlaylistScenes.CountAsync() == 0 && await db.Scenes.CountAsync() == 1, "Remove deleted scene");
+    await playlists.AddSceneAsync(first.Id, scene.Id);
+    await playlists.DeleteAsync(first.Id);
+    Check(await db.Scenes.CountAsync() == 1 && await db.PlaylistScenes.CountAsync() == 0, "Playlist deletion affected scene");
+    await playlists.AddSceneAsync(second.Id, scene.Id);
+    await scenes.DeleteAsync(scene.Id);
+    Check(await db.PlaylistScenes.CountAsync() == 0 && await db.Playlists.CountAsync() == 1, "Scene cascade failed");
+    Console.WriteLine("PASS: migrations/snapshot, validation, duplicate names/memberships, new/existing scene saves, rollback, rename, removal and both cascade directions.");
+}
+finally { await db.Database.EnsureDeletedAsync(); Console.WriteLine("Disposable database removed."); }

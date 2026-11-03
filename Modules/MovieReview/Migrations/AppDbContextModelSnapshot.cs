@@ -423,6 +423,42 @@ namespace MovieReviews.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MovieReviews.Data.Playlist", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Playlists");
+                });
+
+            modelBuilder.Entity("MovieReviews.Data.PlaylistScene", b =>
+                {
+                    b.Property<int>("PlaylistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SceneId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PlaylistId", "SceneId");
+
+                    b.HasIndex("SceneId");
+
+                    b.ToTable("PlaylistScenes");
+                });
+
             modelBuilder.Entity("MovieReviews.Data.ResearchDoc", b =>
                 {
                     b.Property<int>("Id")
@@ -824,6 +860,25 @@ namespace MovieReviews.Migrations
                     b.Navigation("SkinColor");
                 });
 
+            modelBuilder.Entity("MovieReviews.Data.PlaylistScene", b =>
+                {
+                    b.HasOne("MovieReviews.Data.Playlist", "Playlist")
+                        .WithMany("Scenes")
+                        .HasForeignKey("PlaylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MovieReviews.Data.Scene", "Scene")
+                        .WithMany()
+                        .HasForeignKey("SceneId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Playlist");
+
+                    b.Navigation("Scene");
+                });
+
             modelBuilder.Entity("MovieReviews.Data.ResearchSection", b =>
                 {
                     b.HasOne("MovieReviews.Data.ResearchSection", "Parent")
@@ -893,6 +948,11 @@ namespace MovieReviews.Migrations
                 });
 
             modelBuilder.Entity("MovieReviews.Data.Performer", b =>
+                {
+                    b.Navigation("Scenes");
+                });
+
+            modelBuilder.Entity("MovieReviews.Data.Playlist", b =>
                 {
                     b.Navigation("Scenes");
                 });

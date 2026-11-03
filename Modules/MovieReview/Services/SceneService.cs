@@ -34,7 +34,7 @@ public class SceneService
 			.FirstOrDefaultAsync(s => s.Id == id);
 	}
 
-	public async Task<Scene> AddAsync(Scene s)
+	public async Task<Scene> AddAsync(Scene s, IReadOnlyCollection<int>? playlistIds = null)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
 
@@ -61,6 +61,7 @@ public class SceneService
 		saved.IsPinnedDraft = s.IsDraft && s.IsPinnedDraft;
 		saved.Performers = links;
 		db.Scenes.Add(saved);
+        await PlaylistService.SetMembershipAsync(db, saved, playlistIds);
 		await db.SaveChangesAsync();
 		s.Id = saved.Id;
 		s.CreatedDate = saved.CreatedDate;
@@ -70,11 +71,13 @@ public class SceneService
 		return s;
 	}
 
-	public async Task UpdateAsync(Scene s)
+	public async Task UpdateAsync(Scene s, IReadOnlyCollection<int>? playlistIds = null)
 	{
 		await using var db = await _factory.CreateDbContextAsync();
 
 		var existing = await db.Scenes.FirstAsync(x => x.Id == s.Id);
+
+		await PlaylistService.SetMembershipAsync(db, existing, playlistIds);
 
 		existing.Title = s.Title;
 		existing.Studio = s.Studio;
