@@ -416,8 +416,18 @@ document.addEventListener('click', event => {
 });
 document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => showForm(button.dataset.add)));
 getElement('completeAllMissed').addEventListener('click', async () => {
-  if (!missedCount || !confirm(`Mark all ${missedCount} missed tasks as done? This fills every remaining count. You can undo individual completions in Recently done.`)) return;
+  if (!missedCount) return;
+  getElement('missedConfirmationText').textContent = `Mark all ${missedCount} missed tasks as done? This fills every remaining count. You can undo individual completions in Recently done.`;
+  getElement('missedConfirmation').hidden = false;
+  getElement('confirmCompleteAllMissed').focus();
+});
+getElement('cancelCompleteAllMissed').addEventListener('click', () => {
+  getElement('missedConfirmation').hidden = true;
+  getElement('completeAllMissed').focus();
+});
+getElement('confirmCompleteAllMissed').addEventListener('click', async () => {
   const button = getElement('completeAllMissed');
+  getElement('missedConfirmation').hidden = true;
   button.disabled = true;
   try {
     const result = await request('/bookmarks/api/checklist/missed/complete-all', { method: 'POST' });
