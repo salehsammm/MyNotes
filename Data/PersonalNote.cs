@@ -11,6 +11,7 @@ public class PersonalNote
     public string Title { get; set; } = "";
     public PersonalNoteKind Kind { get; set; } = PersonalNoteKind.Note;
     public bool IsFavorite { get; set; }
+    public bool IsLocked { get; set; }
     public DateOnly NoteDate { get; set; }
     [StringLength(100)]
     public string? Category { get; set; }

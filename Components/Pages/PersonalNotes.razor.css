@@ -19,6 +19,25 @@
     flex-shrink: 0;
 }
 
+.note-lock {
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font-size: 20px;
+    line-height: 1;
+    padding: 6px;
+    flex-shrink: 0;
+}
+
+.note-lock[aria-pressed="true"] {
+    background: #263025;
+}
+
+.note-lock:focus-visible {
+    outline: 2px solid #c5df8b;
+    outline-offset: 2px;
+}
+
 .note-favorite[aria-pressed="true"] {
     color: #e5b95c;
 }

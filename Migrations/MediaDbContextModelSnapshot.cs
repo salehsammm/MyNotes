@@ -108,6 +108,7 @@ public class MediaDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("nvarchar(max)");
 
                 b.Property<bool>("IsFavorite").HasColumnType("bit");
+                b.Property<bool>("IsLocked").IsConcurrencyToken().HasColumnType("bit");
 
                 b.Property<int>("Kind")
                     .HasColumnType("int");

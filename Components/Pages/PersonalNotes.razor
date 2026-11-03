@@ -5,6 +5,9 @@
 @inject Microsoft.EntityFrameworkCore.IDbContextFactory<MediaDbContext> DbFactory
 @inject IJSRuntime JS
 @inject Microsoft.Extensions.Logging.ILogger<PersonalNotes> Logger
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationState
+@inject MyNotes.Security.PrivateAccessStore PrivateAccess
+@implements IAsyncDisposable
 
 <PageTitle>Personal notes · Frame Notes</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@(dirty || groupDirty)" OnBeforeInternalNavigation="BeforeNavigation" />
@@ -19,6 +22,14 @@
             <button class="button primary" @onclick="() => RequestNew(PersonalNoteKind.Note)" disabled="@busy">+ New note</button>
             <button class="button ghost" @onclick="() => RequestNew(PersonalNoteKind.Diary)" disabled="@busy">+ Today's diary</button>
             <button class="button ghost" @onclick="() => EditGroup(null)" disabled="@busy">+ New group</button>
+            @if (canReadLocked)
+            {
+                <form method="post" action="/private/lock"><AntiforgeryToken /><input type="hidden" name="returnUrl" value="/journal/notes" /><button type="submit" class="button ghost">Lock private session</button></form>
+            }
+            else
+            {
+                <a class="button ghost" href="/private?returnUrl=%2Fjournal%2Fnotes" data-enhance-nav="false">Unlock locked notes</a>
+            }
         </nav>
         @if (showGroupEditor)
         {
@@ -93,7 +104,7 @@
                     {
                         <button class="library-item @(selectedId == note.Id ? "selected" : "")" @onclick="() => RequestSelect(note.Id)" disabled="@busy" @key="note.Id">
                             <span class="item-icon">@if (note.IsFavorite) { <span class="favorite-star" aria-label="Favorite">★</span> } else { @(note.Kind == PersonalNoteKind.Diary ? "◷" : "▤") }</span>
-                            <span class="item-main"><strong>@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(EffectiveCategory(note) ?? "Uncategorized")</small>@if (note.NoteGroup is not null) { <small>@note.NoteGroup.Name</small> }<span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
+                            <span class="item-main"><strong>@if (note.IsLocked) { <span aria-label="Password protected">🔒 </span> }@note.Title</strong><small>@note.NoteDate.ToString("yyyy-MM-dd") · @note.Kind · @(EffectiveCategory(note) ?? "Uncategorized")</small>@if (note.NoteGroup is not null) { <small>@note.NoteGroup.Name</small> }<span class="note-excerpt" dir="auto">@Excerpt(note)</span></span>
                         </button>
                     }
                     @if (!busy && notes.Count == 0) { <p class="empty-list">No notes found. Write a note or start today's diary above.</p> }
@@ -109,6 +120,7 @@
                     <div class="note-heading-title">
                         <h2>@(selectedId is null ? (form.Kind == PersonalNoteKind.Diary ? "New diary entry" : "New note") : (form.Kind == PersonalNoteKind.Diary ? "Diary entry" : "Your note"))</h2>
                         <button type="button" class="note-favorite" aria-label="@(form.IsFavorite ? "Remove from favorites" : "Mark as favorite")" title="@(form.IsFavorite ? "Remove from favorites" : "Mark as favorite")" aria-pressed="@(form.IsFavorite ? "true" : "false")" @onclick="ToggleFavorite" disabled="@busy">@(form.IsFavorite ? "★" : "☆")</button>
+                        <button type="button" class="note-lock" aria-label="@(form.IsLocked ? "Remove password protection" : "Protect with private password")" title="@(form.IsLocked ? "Remove password protection (save to apply)" : "Protect with private password (save to apply)")" aria-pressed="@(form.IsLocked ? "true" : "false")" @onclick="ToggleLock" disabled="@busy">@(form.IsLocked ? "🔒" : "🔓")</button>
                     </div>
                     <span class="note-save-state" role="status">@(dirty ? "Unsaved changes" : selectedId is not null ? "Saved" : "")</span>
                 </div>

@@ -44,6 +44,7 @@ public partial class PersonalNotes
     private void SetForm(PersonalNote note)
     {
         form = note;
+        selectedNoteLocked = selectedId is not null && note.IsLocked;
         editContext = new(form);
         editContext.OnFieldChanged += (_, _) => dirty = true;
         dirty = false;
@@ -65,7 +66,7 @@ public partial class PersonalNotes
     private Task RequestSelect(int id) => RequestChange(() => Run(async () =>
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        var note = await db.PersonalNotes.AsNoTracking().Include(x => x.NoteGroup).Include(x => x.ResearchEntries).SingleOrDefaultAsync(x => x.Id == id);
+        var note = await VisibleNotes(db).AsNoTracking().Include(x => x.NoteGroup).Include(x => x.ResearchEntries).SingleOrDefaultAsync(x => x.Id == id);
         if (note is null) { error = "This note no longer exists. Search again to refresh the list."; return; }
         selectedId = note.Id;
         note.Category = EffectiveCategory(note);
@@ -100,7 +101,7 @@ public partial class PersonalNotes
         if (busy) return;
         busy = true;
         error = message = null;
-        try { await action(); }
+        try { await RefreshAccess(); await action(); await RefreshAccess(); }
         catch (Exception ex) { Logger.LogError(ex, "Personal notes operation failed"); error = "Could not update your notes. Your writing is still here; please try again."; }
         finally { busy = false; }
     }
@@ -124,13 +125,14 @@ public partial class PersonalNotes
 
     private async Task RefreshResults()
     {
+        var includedPrivateNotes = canReadLocked;
         if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
         {
             error = "From date must be on or before To date.";
             return;
         }
         await using var db = await DbFactory.CreateDbContextAsync();
-        var query = db.PersonalNotes.AsNoTracking().Include(n => n.NoteGroup).AsQueryable();
+        var query = VisibleNotes(db).AsNoTracking().Include(n => n.NoteGroup).AsQueryable();
         if (groupFilter > 0) query = query.Where(n => n.NoteGroupId == groupFilter);
         if (groupFilter == -1) query = query.Where(n => n.NoteGroupId == null);
         if (kindFilter == "Notes") query = query.Where(n => n.Kind == PersonalNoteKind.Note);
@@ -153,9 +155,14 @@ public partial class PersonalNotes
         };
         notes = await query.Take(resultLimit).ToListAsync();
         groups = await db.NoteGroups.AsNoTracking().OrderBy(g => g.Name).ToListAsync();
-        groupCounts = await db.PersonalNotes.Where(n => n.NoteGroupId != null).GroupBy(n => n.NoteGroupId!.Value).Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Id, g => g.Count);
-        categories = await db.PersonalNotes.Where(n => n.NoteGroupId == null && n.Category != null).Select(n => n.Category!)
+        groupCounts = await VisibleNotes(db).Where(n => n.NoteGroupId != null).GroupBy(n => n.NoteGroupId!.Value).Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Id, g => g.Count);
+        categories = await VisibleNotes(db).Where(n => n.NoteGroupId == null && n.Category != null).Select(n => n.Category!)
             .Union(db.NoteGroups.Where(g => g.Category != null).Select(g => g.Category!)).OrderBy(c => c).ToListAsync();
+        if (includedPrivateNotes && !await PrivateSessionIsLive())
+        {
+            await RefreshAccess();
+            await RefreshResults();
+        }
     }
 
     private Task SaveNote() => Run(async () =>
@@ -173,15 +180,18 @@ public partial class PersonalNotes
             group = await db.NoteGroups.FindAsync(groupId);
             if (group is null) { error = "This group no longer exists. Choose another group or No group."; return; }
         }
-        var note = selectedId is int id ? await db.PersonalNotes.Include(n => n.ResearchEntries).SingleOrDefaultAsync(n => n.Id == id) : new PersonalNote();
+        if (form.IsLocked && !PrivateAccess.IsConfigured) { error = "Configure the Private area password before protecting notes."; return; }
+        var note = selectedId is int id ? await VisibleNotes(db).Include(n => n.ResearchEntries).SingleOrDefaultAsync(n => n.Id == id) : new PersonalNote();
         if (note is null) { error = "This note no longer exists. Your writing is still here."; return; }
+        var wasLocked = note.IsLocked;
         note.Title = form.Title.Trim();
         note.Kind = form.Kind;
         note.IsFavorite = form.IsFavorite;
+        note.IsLocked = form.IsLocked;
         note.NoteDate = form.NoteDate;
         var category = string.IsNullOrWhiteSpace(form.Category) ? null : form.Category.Trim();
         note.NoteGroupId = group?.Id;
-        note.Category = group is not null ? group.Category : category is null ? null : await db.PersonalNotes.Where(n => n.Category == category).Select(n => n.Category).FirstOrDefaultAsync() ?? category;
+        note.Category = group is not null ? group.Category : category is null ? null : await VisibleNotes(db).Where(n => n.Category == category).Select(n => n.Category).FirstOrDefaultAsync() ?? category;
         // Preserve the user's paragraphs and Unicode text exactly as written.
         note.Details = form.Details;
         note.Conclusion = form.Conclusion;
@@ -189,8 +199,10 @@ public partial class PersonalNotes
         note.UpdatedAtUtc = DateTime.UtcNow;
         UpdateResearch(db, note);
         if (selectedId is null) db.PersonalNotes.Add(note);
+        if (wasLocked && !await PrivateSessionIsLive()) { await RefreshAccess(); error = "Unlock locked notes before saving this entry."; return; }
         await db.SaveChangesAsync();
         selectedId = note.Id;
+        selectedNoteLocked = note.IsLocked;
         form.Category = note.Category;
         form.CreatedAtUtc = note.CreatedAtUtc;
         form.UpdatedAtUtc = note.UpdatedAtUtc;
@@ -205,7 +217,9 @@ public partial class PersonalNotes
     {
         if (selectedId is not int id) return;
         await using var db = await DbFactory.CreateDbContextAsync();
-        var note = await db.PersonalNotes.FindAsync(id);
+        var note = await VisibleNotes(db).SingleOrDefaultAsync(n => n.Id == id);
+        if (note is null) { error = "Unlock locked notes to access this entry, or refresh the list."; return; }
+        if (note.IsLocked && !await PrivateSessionIsLive()) { await RefreshAccess(); error = "Unlock locked notes before deleting this entry."; return; }
         if (note is not null) { db.PersonalNotes.Remove(note); await db.SaveChangesAsync(); }
         selectedId = null;
         SetForm(new() { NoteDate = Today });

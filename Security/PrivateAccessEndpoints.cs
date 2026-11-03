@@ -76,11 +76,11 @@ public static class PrivateAccessEndpoints
             catch (AntiforgeryValidationException) { return Results.BadRequest("Refresh the page and try again."); }
             access.Revoke(context.User);
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return Results.Redirect("/");
+            return Results.Redirect(context.Request.Form["returnUrl"] == "/journal/notes" ? "/journal/notes" : "/");
         });
     }
 
     private static string SafeReturnUrl(string? value)
-        => value == "/moviereview" || value?.StartsWith("/moviereview/", StringComparison.Ordinal) == true
+        => value == "/journal/notes" || value == "/moviereview" || value?.StartsWith("/moviereview/", StringComparison.Ordinal) == true
             ? value : "/moviereview";
 }

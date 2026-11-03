@@ -31,6 +31,7 @@ public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContex
         });
         modelBuilder.Entity<PersonalNote>(entity =>
         {
+            entity.Property(x => x.IsLocked).IsConcurrencyToken();
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Category).HasMaxLength(100);
             entity.Property(x => x.Details).HasColumnType("nvarchar(max)");

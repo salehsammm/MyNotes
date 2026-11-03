@@ -119,6 +119,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
+    if (context.Request.Path.StartsWithSegments("/journal/notes"))
+        context.Response.Headers.CacheControl = "no-store";
     if (context.Request.Path.StartsWithSegments("/moviereview"))
     {
         context.Response.Headers.CacheControl = "no-store";
