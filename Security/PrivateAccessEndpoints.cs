@@ -21,9 +21,11 @@ public static class PrivateAccessEndpoints
             var encoder = HtmlEncoder.Default;
             var html = $$"""
                 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private area</title>
-                <style>body{margin:0;background:#101416;color:#eee;font:16px 'Segoe UI',sans-serif;display:grid;place-items:center;min-height:100vh}.card{width:min(360px,80vw);padding:32px;border:1px solid #354038;border-radius:12px;background:#1b211e}h1{font-size:24px}p{color:#b0b9af;font-size:14px;line-height:1.6}label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #52604d;border-radius:4px;background:#101416;color:white;font:inherit}button{width:100%;margin:18px 0;padding:12px;background:#c5df8b;color:#182018;border:0;border-radius:4px;font-weight:700}a{color:#c5df8b;font-size:13px}</style></head>
+                <style>body{margin:0;background:#101416;color:#eee;font:16px 'Segoe UI',sans-serif;display:grid;place-items:center;min-height:100vh}.card{width:min(360px,80vw);padding:32px;border:1px solid #354038;border-radius:12px;background:#1b211e}h1{font-size:24px}p{color:#b0b9af;font-size:14px;line-height:1.6}label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #52604d;border-radius:4px;background:#101416;color:white;font:inherit}button{width:100%;margin:18px 0;padding:12px;background:#c5df8b;color:#182018;border:0;border-radius:4px;font-weight:700}a{color:#c5df8b;font-size:13px}</style>
                 <style>.password-field{position:relative}.password-field input{padding-right:52px}.password-toggle{position:absolute;right:4px;top:4px;bottom:4px;display:grid;place-items:center;width:40px;margin:0;padding:8px;background:transparent;color:#c5df8b;cursor:pointer}.password-toggle:hover{background:#263025}.password-toggle:focus-visible{outline:2px solid #c5df8b;outline-offset:2px}.password-toggle svg{width:22px;height:22px}.password-toggle [hidden]{display:none}</style>
-                <body><main class="card"><h1>Private area</h1><p role="status">{{status}}</p>
+                <link rel="stylesheet" href="/navigation.css?v=1"><style>body{display:block}.card{margin:clamp(30px,8vh,90px) auto}</style></head>
+                <body><div class="project-header"><nav class="project-switcher" aria-label="Projects"><a href="/">BookmarkCounter</a><a href="/journal">MyNotes journal</a><a href="/moviereview" class="selected" aria-current="true">MovieReview</a></nav><nav class="project-sections" aria-label="MovieReview sections"><a href="/private" class="selected" aria-current="page">Unlock private area</a></nav></div>
+                <main class="card"><h1>Private area</h1><p role="status">{{status}}</p>
                 <form method="post" action="/private/unlock"><input type="hidden" name="{{encoder.Encode(tokens.FormFieldName)}}" value="{{encoder.Encode(tokens.RequestToken ?? "")}}">
                 <input type="hidden" name="returnUrl" value="{{encoder.Encode(returnUrl)}}"><label for="password">Password</label>
                 <div class="password-field">
@@ -34,6 +36,7 @@ public static class PrivateAccessEndpoints
                 </div>
                 <button type="submit">Unlock</button></form>
                 <a href="/">Back to dashboard</a></main>
+                <footer class="project-footer">MovieReview <span aria-hidden="true">·</span> Keep your collection in one place.</footer>
                 <script>
                     const passwordInput = document.getElementById('password');
                     const passwordToggle = document.getElementById('password-toggle');

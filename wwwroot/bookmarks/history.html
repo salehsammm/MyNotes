@@ -6,11 +6,16 @@
   <meta name="theme-color" content="#101416">
   <title>History · BookmarkCounter</title>
   <link rel="stylesheet" href="/bookmarks/css/app.css?v=13">
+  <link rel="stylesheet" href="/navigation.css?v=1">
   <script src="/bookmarks/js/history.js?v=3" defer></script>
 </head>
 <body>
-  <nav aria-label="MyNotes navigation" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/journal" style="color:#eee">MyNotes journal</a></nav>
-  <div class="app-shell">
+  <div class="project-header">
+    <nav class="project-switcher" aria-label="Projects">
+      <a href="/" class="selected" aria-current="true">BookmarkCounter</a>
+      <a href="/journal">MyNotes journal</a>
+      <a href="/moviereview">MovieReview</a>
+    </nav>
     <header class="site-header">
       <a class="brand" href="/" aria-label="BookmarkCounter home">
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 4.5h12v15l-6-4-6 4v-15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
@@ -22,6 +27,8 @@
         <a class="nav-link active" href="/bookmarks/history" aria-current="page">History <span aria-hidden="true">↗</span></a>
       </nav>
     </header>
+  </div>
+  <div class="app-shell">
 
     <main class="history-main">
       <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Your progress</div>
@@ -33,7 +40,7 @@
       </section>
       <p class="history-note">A lower count means your backlog is getting smaller. Counts are logged automatically every hour.</p>
     </main>
-    <footer class="site-footer">A calmer way to clear the queue.</footer>
+    <footer class="site-footer project-footer">A calmer way to clear the queue.</footer>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>

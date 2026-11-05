@@ -1,3 +1,6 @@
+/* The layout supplies the persistent footer for every journal page. */
+::deep .shell > footer { display: none; }
+
 #blazor-error-ui {
     color-scheme: light only;
     background: lightyellow;

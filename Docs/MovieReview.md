@@ -120,7 +120,7 @@ EF tooling uses `DesignTimeAppDbContextFactory` to read the same connection conf
 
 ## Password protection
 
-Enter through `/private`, which is not shown in public navigation. All pages import the `PrivateArea` authorization attribute. The host gates direct private URLs and assets, and overrides the module DbContext factory with `PrivateMovieDbContextFactory` to check session access before each database operation. Preserve these controls for new pages and services; a hidden link by itself does not enforce privacy.
+The shared project header links to `/moviereview`, which redirects to `/private` when locked. All pages import the `PrivateArea` authorization attribute. The host gates direct private URLs and assets, and overrides the module DbContext factory with `PrivateMovieDbContextFactory` to check session access before each database operation. Preserve these controls for new pages and services. The sticky header shows all three project links with MovieReview highlighted and its section navigation on the second row, replacing the old sidebar. A fixed footer remains visible while scrolling.
 
 The module layout includes an antiforgery-protected **Lock private area** form and loads its keyboard shortcut script only inside the private module. The global public App component must not load this script. See root PROJECT.md for password hash storage, session expiry and server maintenance access.
 

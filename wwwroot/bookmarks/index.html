@@ -6,11 +6,16 @@
   <meta name="theme-color" content="#101416">
   <title>Overview · BookmarkCounter</title>
   <link rel="stylesheet" href="/bookmarks/css/app.css?v=12">
+  <link rel="stylesheet" href="/navigation.css?v=1">
   <script src="/bookmarks/js/dashboard.js?v=14" defer></script>
 </head>
 <body>
-  <nav aria-label="MyNotes navigation" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/journal" style="color:#eee">MyNotes journal</a></nav>
-  <div class="app-shell">
+  <div class="project-header">
+    <nav class="project-switcher" aria-label="Projects">
+      <a href="/" class="selected" aria-current="true">BookmarkCounter</a>
+      <a href="/journal">MyNotes journal</a>
+      <a href="/moviereview">MovieReview</a>
+    </nav>
     <header class="site-header">
       <a class="brand" href="/" aria-label="BookmarkCounter home">
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M6 4.5h12v15l-6-4-6 4v-15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
@@ -22,6 +27,8 @@
         <a class="nav-link" href="/bookmarks/history">History <span aria-hidden="true">↗</span></a>
       </nav>
     </header>
+  </div>
+  <div class="app-shell">
 
     <main>
       <section class="bookmark-summary" aria-label="Bookmark count">
@@ -82,7 +89,7 @@
         </section>
       </section>
     </main>
-    <footer class="site-footer">A calmer way to clear the queue.</footer>
+    <footer class="site-footer project-footer">A calmer way to clear the queue.</footer>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>

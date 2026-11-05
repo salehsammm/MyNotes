@@ -39,7 +39,7 @@ The data timestamps follow the original conventions: bookmark snapshots are stor
 
 Schema changes use `--context BookmarkCounter.Data.AppDbContext --output-dir Modules/BookmarkCounter/Migrations`. Update this guide for feature or configuration changes. Verify API reads and a disposable CRUD record when changing a write endpoint, then remove that test record.
 
-The dashboard is the application home page. Its public cross-module navigation contains only the `/journal` link. Do not expose a MovieReview link in these HTML screens.
+The dashboard is the application home page. Every bookmark page has a sticky two-level header: links to BookmarkCounter, MyNotes journal, and MovieReview on the first row, followed by bookmark navigation. The selected project and section are highlighted. MovieReview still requires unlocking. The footer stays at the bottom of the viewport, with content space reserved above it.
 
 Use `getElement` for element lookups in the bookmark scripts. Do not declare a global `$` helper: Visual Studio Browser Link expects `$` to be jQuery and calls `$.noConflict()`. Bump the script query version in its HTML page when updating these assets.
 

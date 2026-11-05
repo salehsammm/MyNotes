@@ -1,4 +1,47 @@
-<nav class="module-navigation" aria-label="MyNotes navigation">
-    <a href="/" data-enhance-nav="false">BookmarkCounter</a>
-    <a href="/journal" data-enhance-nav="false">MyNotes journal</a>
-</nav>
+@inject NavigationManager Navigation
+
+<div class="project-header">
+    <nav class="project-switcher" aria-label="Projects">
+        <a href="/" data-enhance-nav="false" class="@(Project == "bookmarks" ? "selected" : null)" aria-current="@(Project == "bookmarks" ? "true" : null)">BookmarkCounter</a>
+        <a href="/journal" data-enhance-nav="false" class="@(Project == "journal" ? "selected" : null)" aria-current="@(Project == "journal" ? "true" : null)">MyNotes journal</a>
+        <a href="/moviereview" data-enhance-nav="false" class="@(Project == "review" ? "selected" : null)" aria-current="@(Project == "review" ? "true" : null)">MovieReview</a>
+    </nav>
+    <nav class="project-sections" aria-label="@(Project == "review" ? "MovieReview sections" : "Journal sections")">
+        @if (Path.StartsWith("/private", StringComparison.OrdinalIgnoreCase))
+        {
+            <a href="/private" class="selected" aria-current="page">Unlock private area</a>
+        }
+        else if (Project == "review")
+        {
+            @foreach (var entry in ReviewSections)
+            {
+                <NavLink href="@entry.Url" Match="@(entry.Url == "/moviereview" ? NavLinkMatch.All : NavLinkMatch.Prefix)" ActiveClass="selected">@entry.Title</NavLink>
+            }
+        }
+        else
+        {
+            <NavLink href="/journal" Match="NavLinkMatch.All" ActiveClass="selected">Journal</NavLink>
+            <NavLink href="/journal/lists" ActiveClass="selected">My lists</NavLink>
+            <NavLink href="/journal/notes" ActiveClass="selected">Personal notes &amp; diary</NavLink>
+        }
+    </nav>
+</div>
+
+@code {
+    private string Path => new Uri(Navigation.Uri).AbsolutePath;
+    private string Project => Path.StartsWith("/moviereview", StringComparison.OrdinalIgnoreCase)
+        || Path.StartsWith("/private", StringComparison.OrdinalIgnoreCase) ? "review"
+        : Path.StartsWith("/journal", StringComparison.OrdinalIgnoreCase) ? "journal" : "bookmarks";
+
+    private static readonly (string Url, string Title)[] ReviewSections =
+    [
+        ("/moviereview", "Overview"), ("/moviereview/scenes", "Scenes"),
+        ("/moviereview/performers", "Performers"), ("/moviereview/performer-rankings", "Performer rankings"),
+        ("/moviereview/watchlist", "Watchlist"), ("/moviereview/studios", "Studios"),
+        ("/moviereview/stats", "Stats"), ("/moviereview/trophies", "Trophies"),
+        ("/moviereview/ideas", "Ideas"), ("/moviereview/playlists", "Playlists"),
+        ("/moviereview/collections", "Collections"), ("/moviereview/notes", "Notes"),
+        ("/moviereview/research", "Research"), ("/moviereview/guide", "Guide"),
+        ("/moviereview/options", "Options")
+    ];
+}

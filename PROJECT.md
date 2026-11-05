@@ -15,7 +15,7 @@ MyNotes is the single .NET 9 host for three personal modules. Run `dotnet run` f
 - Journal: `Data/`, `Migrations/`, `Components/Pages/Home.razor`.
 - MovieReview: `Modules/MovieReview/` and `wwwroot/moviereview/`.
 - BookmarkCounter: `Modules/BookmarkCounter/` and `wwwroot/bookmarks/`.
-- Public links: `Components/ModuleNavigation.razor` links to the dashboard and journal. Bookmark static pages show only the journal link alongside their usual internal navigation. MovieReview is not linked publicly.
+- Navigation: `Components/ModuleNavigation.razor` and the bookmark static pages share `wwwroot/navigation.css`. A sticky first row links to all three projects, highlights the current project, and stays above a second row of project section links. Footers remain fixed at the viewport bottom with reserved content space. MovieReview navigation is visible, but its password/session protection remains enforced.
 - Private access: `Security/` contains password verification, cookie/session handling, Blazor authentication state, and the protected MovieReview database factory.
 
 All packages and compiled Razor components belong to `MyNotes.csproj`. Root `Components/App.razor` owns the HTML document, Blazor script and combined scoped CSS bundle. Each Blazor layout loads its own global styles. Module links perform full navigation to keep the existing styles separate. The existing module screens are retained; the common UI/UX is pending a later design discussion.
@@ -52,7 +52,7 @@ The combined project built with zero warnings/errors. All three migration histor
 
 ## Private access
 
-Open `/private` manually to unlock MovieReview. It is absent from public navigation. The owner password is stored as a randomly salted PBKDF2-SHA256 hash with 600,000 iterations at `%LOCALAPPDATA%\MyNotes\private-access.json`, outside the repository. Never commit or log the password. `PrivateAccess:PasswordFile` can override the file path if the app runs under another Windows account. A missing password file leaves the private area locked.
+Open MovieReview from the shared project header; locked sessions redirect to `/private` to unlock it. The owner password is stored as a randomly salted PBKDF2-SHA256 hash with 600,000 iterations at `%LOCALAPPDATA%\MyNotes\private-access.json`, outside the repository. Never commit or log the password. `PrivateAccess:PasswordFile` can override the file path if the app runs under another Windows account. A missing password file leaves the private area locked.
 
 Successful entry creates an HttpOnly, SameSite Strict session cookie and an in-memory session with a 30-minute absolute lifetime. The **Lock private area** button revokes the session and returns to the dashboard. Restarting the app also invalidates sessions. Incorrect passwords are rejected, login attempts are limited to five per minute, and unlock/lock forms require antiforgery tokens.
 
