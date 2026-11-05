@@ -430,7 +430,7 @@ else
                 var performer = allPerformers.FirstOrDefault(p => p.Id == sp.PerformerId);
                 if (performer is not null) draft.Append('\n').Append(BuildPerformerBlock(performer, sp)).Append('\n');
             }
-            return draft.ToString();
+            return ReviewTextCleanup.Clean(draft.ToString());
         }
 
         var sb = new StringBuilder();
@@ -474,7 +474,7 @@ else
         sb.Append(string.Join("\n\n", blocks));
         sb.Append("\n\n\n");
 
-        return sb.ToString();
+        return ReviewTextCleanup.Clean(sb.ToString());
     }
 
     private static IEnumerable<string> ExportPositions(List<Position> positions)

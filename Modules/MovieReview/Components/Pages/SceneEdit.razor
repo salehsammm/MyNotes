@@ -45,6 +45,7 @@ else if (_scene is null)
 }
 else
 {
+    @if (_saveNotice is not null) { <div class="alert alert-success" role="status" data-save-version="@_saveVersion">@_saveNotice</div> }
     <PlaylistPicker @key="_scene" Selected="_playlistIds" Disabled="@IsBusy" />
     <EditForm Model="_scene" OnSubmit="SaveCurrent" FormName="sceneForm">
         <div class="scene-editor-status" role="status"><span class="scene-status @(_scene.IsDraft ? "scene-status-draft" : "scene-status-complete")">@(_scene.IsDraft ? "Draft" : "Complete")</span><span>@(_scene.IsDraft ? "Your notes can stay unfinished. Ratings are optional until you complete the review." : "This review is complete. You can move it back to drafts if you want to revisit it.")</span></div>
@@ -285,6 +286,15 @@ else
                                 </button>
                             </div>
                         </div>
+                        @if (perf is not null && ExtraDetails(perf).Any())
+                        {
+                            <aside class="performer-extra-preview" aria-label="Extra details for @perf.Name">
+                                <strong>Profile details</strong>
+                                <dl>
+                                    @foreach (var detail in ExtraDetails(perf)) { <div><dt>@detail.Label</dt><dd>@detail.Value</dd></div> }
+                                </dl>
+                            </aside>
+                        }
                         <div class="row">
                             <fieldset class="col-12 mb-2">
                                 <legend class="fs-6 mb-1">Badges for this scene only</legend>
@@ -559,6 +569,7 @@ else
 
 @code {
     [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery(Name = "saved")] public bool SavedDraft { get; set; }
 
     private HashSet<int> _playlistIds = new();
     private Scene? _scene;
@@ -569,6 +580,9 @@ else
     private bool IsBusy => _loading || _saving || _savingPerformer || _savingStudio || _loadingPerformer;
     private string BusyMessage => _loading ? "Loading scene and editor options…" : _loadingPerformer ? "Loading performer…" : "Saving your changes…";
     private string? _saveError;
+    private string? _saveNotice;
+    private int _lastSavedSceneId;
+    private int _saveVersion;
     private ElementReference _titleInput;
     private bool _focusTitlePending;
     private string _resumeTimeText = "";
@@ -593,11 +607,11 @@ else
     private Performer? _editingPerformer;
     private bool _addNewToScene;
 
-    private bool _showOverall = false;
-    private bool _showSetup = false;
-    private bool _showSex = false;
-    private bool _showPerformers = false;
-    private bool _showExtraModal = false;
+    private bool _showOverall = true;
+    private bool _showSetup = true;
+    private bool _showSex = true;
+    private bool _showPerformers = true;
+    private bool _showExtraModal = true;
 
     private DotNetObjectReference<SceneEdit>? _objRef;
     private bool _jsRegistered;
@@ -625,7 +639,9 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        var requestedId = Id;
         _loading = true;
+        if (Id != _lastSavedSceneId) _saveNotice = null;
         _focusTitlePending = Id == 0;
         _saveError = null;
         _loadError = null;
@@ -638,8 +654,9 @@ else
             var boobsTask = LookupService.GetBoobSizesAsync();
             var assTask = LookupService.GetAssSizesAsync();
             var bjTask = LookupService.GetBjTagsAsync();
-            var sceneTask = Id == 0 ? Task.FromResult<Scene?>(new Scene { IsDraft = true }) : SceneService.GetAsync(Id);
+            var sceneTask = requestedId == 0 ? Task.FromResult<Scene?>(new Scene { IsDraft = true }) : SceneService.GetAsync(requestedId);
             await Task.WhenAll(playlistsTask, performersTask, studiosTask, skinTask, boobsTask, assTask, bjTask, sceneTask);
+            if (Id != requestedId) return;
             _allPerformers = await performersTask;
             _studios = await studiosTask;
             _skinColors = await skinTask;
@@ -655,6 +672,12 @@ else
                 _studios.Add(new Studio { Name = _scene.Studio });
             RefreshAvailable();
             _resumeTimeText = _scene?.ResumeAtSeconds is int seconds ? PlaybackPosition.Format(seconds) : "";
+            if (SavedDraft && Id > 0 && _scene?.Id == Id && _scene.IsDraft && _saveVersion == 0)
+            {
+                _lastSavedSceneId = _scene.Id;
+                _saveVersion++;
+                _saveNotice = "Draft saved.";
+            }
         }
         catch (Exception ex)
         {
@@ -802,6 +825,15 @@ else
         else if (!on) _scene.Locations.Remove(loc);
     }
 
+    private static IEnumerable<(string Label, string Value)> ExtraDetails(Performer p)
+    {
+        if (p.AgeCategory is not null) yield return ("Age category", PerformerAgeCategories.Label(p.AgeCategory.Value));
+        if (p.DoesNotSpeakEnglish) yield return ("Language", "Does not speak English");
+        foreach (var detail in new[] { ("Face", p.FaceQuality), ("Body size", p.BodySize), ("Body quality", p.BodyQuality),
+            ("Belly", p.BellyQuality), ("Legs", p.LegQuality), ("Boobs quality", p.BoobsQuality), ("Ass quality", p.AssQuality), ("BJ quality", p.BjQuality), ("Profile notes", p.Notes) })
+            if (!string.IsNullOrWhiteSpace(detail.Item2)) yield return (detail.Item1, detail.Item2);
+    }
+
     private static string? BjTagsPlaceholder(Performer? p)
     {
         if (p is null || p.BjTags.Count == 0) return null;
@@ -833,7 +865,7 @@ else
             _editingPerformer = await PerformerService.GetAsync(performerId);
             _performerError = null;
             _addNewToScene = false;
-            _showExtraModal = false;
+            _showExtraModal = true;
         }
         catch (Exception ex)
         {
@@ -849,7 +881,7 @@ else
         _editingPerformer = new Performer { Name = _performerSearch.Trim() };
         _performerError = null;
         _addNewToScene = true;
-        _showExtraModal = false;
+        _showExtraModal = true;
     }
 
     private void CloseEditPerformer()
@@ -858,7 +890,7 @@ else
         _editingPerformer = null;
         _performerError = null;
         _addNewToScene = false;
-        _showExtraModal = false;
+        _showExtraModal = true;
     }
 
     private bool IsBjCheckedModal(int id) =>
@@ -900,7 +932,7 @@ else
             RefreshAvailable();
             _editingPerformer = null;
             _addNewToScene = false;
-            _showExtraModal = false;
+            _showExtraModal = true;
         }
         catch (InvalidOperationException ex)
         {
@@ -928,6 +960,7 @@ else
         if (_scene is null || IsBusy) return;
 
         _saveError = null;
+        _saveNotice = null;
         _scene.Title = _scene.Title.Trim();
         if (_scene.Title.Length == 0)
         {
@@ -947,6 +980,7 @@ else
         }
 
         _saving = true;
+        await InvokeAsync(StateHasChanged);
         var wasDraft = _scene.IsDraft;
         _scene.IsDraft = asDraft;
 
@@ -956,8 +990,24 @@ else
                 await SceneService.AddAsync(_scene, _playlistIds);
             else
                 await SceneService.UpdateAsync(_scene, _playlistIds);
-            await JS.InvokeVoidAsync("appBusy.beginNavigation");
-            Nav.NavigateTo(asDraft ? "/moviereview/scenes" : $"/moviereview/scenes/{_scene.Id}/export");
+            if (asDraft)
+            {
+                _lastSavedSceneId = _scene.Id;
+                if (Id == 0)
+                {
+                    Nav.NavigateTo($"/moviereview/scenes/{_scene.Id}?saved=true", replace: true);
+                }
+                else
+                {
+                    _saveVersion++;
+                    _saveNotice = "Draft saved.";
+                }
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("appBusy.beginNavigation");
+                Nav.NavigateTo($"/moviereview/scenes/{_scene.Id}/export");
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -974,6 +1024,7 @@ else
         finally
         {
             _saving = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 }

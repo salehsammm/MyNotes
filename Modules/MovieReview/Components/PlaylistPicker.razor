@@ -24,6 +24,8 @@
                 <input id="picker-playlist-name" class="form-control" maxlength="160" @bind="_name" />
                 <button type="button" class="btn btn-primary" @onclick="Create">Create and select</button>
             </div>
+            <label for="picker-playlist-description">Playlist description (optional)</label>
+            <textarea id="picker-playlist-description" class="form-control mb-3" rows="2" maxlength="10000" @bind="_description"></textarea>
             <button type="button" class="btn btn-secondary" @onclick="() => _open = false">Done</button>
             <a class="ms-3" href="/moviereview/playlists" target="_blank" rel="noopener">Manage playlists</a>
         </fieldset>
@@ -34,7 +36,7 @@
     [Parameter] public HashSet<int> Selected { get; set; } = new();
     [Parameter] public bool Disabled { get; set; }
     private List<Playlist> _playlists = new();
-    private string _name = "";
+    private string _name = "", _description = "";
     private string? _error;
     private bool _open, _busy;
 
@@ -60,11 +62,11 @@
         _error = null;
         try
         {
-            var playlist = await Playlists.CreateAsync(_name);
+            var playlist = await Playlists.CreateAsync(_name, _description);
             _playlists.Add(playlist);
             _playlists = _playlists.OrderBy(p => p.Name).ToList();
             Selected.Add(playlist.Id);
-            _name = "";
+            _name = _description = "";
         }
         catch (InvalidOperationException ex) { _error = ex.Message; }
         catch (Exception ex) { Logger.LogError(ex, "Failed to create playlist"); _error = "Could not create the playlist. Try again."; }

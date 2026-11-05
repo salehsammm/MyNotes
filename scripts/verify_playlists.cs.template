@@ -22,8 +22,10 @@ try
     var oldPlaylist = new Playlist { Name = "Upgrade fixture" };
     var oldZ = new Scene { Title = "Z upgrade", IsDraft = true };
     var oldA = new Scene { Title = "A upgrade", IsDraft = true };
-    db.AddRange(oldPlaylist, oldZ, oldA);
+    db.AddRange(oldZ, oldA);
     await db.SaveChangesAsync();
+    await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Playlists (Name) VALUES ({oldPlaylist.Name})");
+    oldPlaylist.Id = await db.Playlists.Where(p => p.Name == oldPlaylist.Name).Select(p => p.Id).SingleAsync();
     await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO PlaylistScenes (PlaylistId, SceneId) VALUES ({oldPlaylist.Id}, {oldZ.Id}), ({oldPlaylist.Id}, {oldA.Id})");
     await db.Database.MigrateAsync();
     var upgrade = await db.PlaylistScenes.AsNoTracking().Where(p => p.PlaylistId == oldPlaylist.Id).OrderBy(p => p.Position).ToListAsync();
@@ -38,6 +40,18 @@ try
     await Reject(() => playlists.CreateAsync(new string('x', 161)));
     var first = await playlists.CreateAsync("  First  ");
     var second = await playlists.CreateAsync("Second");
+    await playlists.SaveDescriptionAsync(first.Id, "Watch later\nWith a description");
+    Check((await playlists.GetAllAsync()).Single(p => p.Id == first.Id).Description == "Watch later\nWith a description", "Description save failed");
+    await playlists.RenameAsync(first.Id, "First renamed");
+    Check((await playlists.GetAllAsync()).Single(p => p.Id == first.Id).Description.Contains("Watch later"), "Rename lost description");
+    await playlists.RenameAsync(first.Id, "First");
+    await Reject(() => playlists.SaveDescriptionAsync(first.Id, new string('x', 10001)));
+    await Reject(() => playlists.CreateAsync("Too long", new string('x', 10001)));
+    await playlists.SaveDescriptionAsync(first.Id, "");
+    Check((await playlists.GetAllAsync()).Single(p => p.Id == first.Id).Description == "", "Description clear failed");
+    var described = await playlists.CreateAsync("Described", "Created with description");
+    Check((await playlists.GetAllAsync()).Single(p => p.Id == described.Id).Description == "Created with description", "Create lost description");
+    await playlists.DeleteAsync(described.Id);
     Check(first.Name == "First", "Name not trimmed");
     await Reject(() => playlists.CreateAsync("first"));
     await Reject(() => playlists.RenameAsync(second.Id, "First"));
@@ -100,6 +114,14 @@ try
     await playlists.AddSceneAsync(second.Id, scene.Id);
     await scenes.DeleteAsync(scene.Id);
     Check(await db.PlaylistScenes.CountAsync() == 0 && await db.Playlists.CountAsync() == 1, "Scene cascade failed");
-    Console.WriteLine("PASS: migrations/snapshot, validation, duplicate names/memberships, new/existing scene saves, rollback, upgrade backfill, max+1 append, reorder, isolated notes, concurrent append, rename, removal and both cascade directions.");
+    foreach (var pair in new[] { ("medium Medium medium", "medium"), ("،،", "،"), (", ,", ","), (":,", ":"), (": ,", ":"), ("😀 😀😀", "😀"), ("❤❤", "❤"), ("خوب خوب", "خوب"), ("fav++ -- ... 10 10", "fav++ -- ... 10 10"), ("good\ngood", "good\ngood"), ("good face good body", "good face good body") })
+        Check(ReviewTextCleanup.Clean(pair.Item1) == pair.Item2, "Text cleanup failed: " + pair.Item1);
+    var exportScene = new Scene { Title = "Export fixture", SetupNotes = "medium Medium, ,", SexNotes = ": , 😀 😀", IsDraft = false };
+    var export = MovieReviews.Components.Pages.Scenes.BuildExportText(exportScene, new());
+    Check(export.Contains("medium,") && !export.Contains("Medium") && !export.Contains(": ,"), "Completed export cleanup missing");
+    exportScene.IsDraft = true;
+    Check(!MovieReviews.Components.Pages.Scenes.BuildExportText(exportScene, new()).Contains("Medium"), "Draft export cleanup missing");
+    Check(exportScene.SetupNotes == "medium Medium, ," && exportScene.SexNotes == ": , 😀 😀", "Cleanup changed source fields");
+    Console.WriteLine("PASS: migrations/snapshot, descriptions, export cleanup, validation, duplicate names/memberships, new/existing scene saves, rollback, upgrade backfill, max+1 append, reorder, isolated notes, concurrent append, rename, removal and both cascade directions.");
 }
 finally { await db.Database.EnsureDeletedAsync(); Console.WriteLine("Disposable database removed."); }

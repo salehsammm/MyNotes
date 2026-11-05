@@ -19,6 +19,8 @@
         <form @onsubmit="Create" @onsubmit:preventDefault>
             <label for="new-playlist-name">Playlist name</label>
             <div class="d-flex gap-2"><input id="new-playlist-name" class="form-control" maxlength="160" @bind="_name" /><button type="submit" class="btn btn-primary">Create playlist</button></div>
+            <label class="mt-2" for="new-playlist-description">Description (optional)</label>
+            <textarea id="new-playlist-description" class="form-control" rows="2" maxlength="10000" @bind="_description"></textarea>
         </form>
     </section>
     @if (!_busy && _playlists.Count == 0) { <p>No playlists yet. Create one above or from a scene editor.</p> }
@@ -26,11 +28,21 @@
     @foreach (var playlist in _playlists)
     {
         <section class="card p-3 mb-3" @key="playlist.Id" aria-label="@playlist.Name" data-playlist-id="@playlist.Id">
+            <details class="playlist-panel">
+            <summary class="playlist-summary"><span>@playlist.Name</span><small>@playlist.Scenes.Count scene(s)</small></summary>
+            <div class="playlist-panel-body">
+            @if (!string.IsNullOrWhiteSpace(playlist.Description)) { <p class="playlist-description">@playlist.Description</p> }
             <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-                <h3 class="me-auto mb-0">@playlist.Name <small class="text-muted">(@playlist.Scenes.Count)</small></h3>
+                <button class="btn btn-outline-secondary" @onclick="() => BeginDescription(playlist)">@(string.IsNullOrWhiteSpace(playlist.Description) ? "Add description" : "Edit description")</button>
                 <button class="btn btn-outline-secondary" @onclick="() => BeginRename(playlist)">Rename</button>
                 <button class="btn btn-outline-danger" @onclick="() => _deleteId = playlist.Id">Delete playlist</button>
             </div>
+            @if (_descriptionId == playlist.Id)
+            {
+                <label for="description-@playlist.Id">Playlist description</label>
+                <textarea id="description-@playlist.Id" class="form-control mb-2" rows="3" maxlength="10000" @bind="_editDescription" @bind:event="oninput"></textarea>
+                <div class="d-flex gap-2 mb-3"><button type="button" class="btn btn-primary" @onclick="() => SaveDescription(playlist.Id)">Save description</button><button type="button" class="btn btn-secondary" @onclick="() => _descriptionId = 0">Cancel</button></div>
+            }
             @if (_renameId == playlist.Id)
             {
                 <form class="d-flex gap-2 mb-3" @onsubmit="() => Rename(playlist.Id)" @onsubmit:preventDefault>
@@ -99,6 +111,8 @@
                     </li>
                 }
             </ol>
+            </div>
+            </details>
         </section>
     }
 </fieldset>
@@ -108,7 +122,8 @@
     private List<Scene> _scenes = new();
     private Dictionary<int, int> _sceneIds = new();
     private Dictionary<int, string> _search = new();
-    private string _name = "", _renameName = "";
+    private string _name = "", _renameName = "", _description = "", _editDescription = "";
+    private int _descriptionId;
     private string? _error;
     private string _notice = "";
     private Dictionary<(int PlaylistId, int SceneId), string> _notes = new();
@@ -178,7 +193,9 @@
         _notice = "Playlist note saved.";
     });
     private Task Load() => Run(() => Task.CompletedTask);
-    private Task Create() => Run(async () => { await PlaylistsService.CreateAsync(_name); _name = ""; });
+    private Task Create() => Run(async () => { await PlaylistsService.CreateAsync(_name, _description); _name = _description = ""; });
+    private void BeginDescription(Playlist p) { _descriptionId = p.Id; _editDescription = p.Description; }
+    private Task SaveDescription(int id) => Run(async () => { await PlaylistsService.SaveDescriptionAsync(id, _editDescription); _descriptionId = 0; _notice = "Playlist description saved."; });
     private void BeginRename(Playlist p) { _renameId = p.Id; _renameName = p.Name; }
     private Task Rename(int id) => Run(async () => { await PlaylistsService.RenameAsync(id, _renameName); _renameId = 0; });
     private Task Delete(int id) => Run(async () => { await PlaylistsService.DeleteAsync(id); _deleteId = 0; });

@@ -31,6 +31,7 @@ public class AppDbContext : DbContext
 	protected override void OnModelCreating(ModelBuilder b)
 	{
         b.Entity<Playlist>().Property(p => p.Name).HasMaxLength(160);
+        b.Entity<Playlist>().Property(p => p.Description).HasMaxLength(10000);
         b.Entity<Playlist>().HasIndex(p => p.Name).IsUnique();
         b.Entity<PlaylistScene>().Property(p => p.Note).HasMaxLength(10000);
         b.Entity<PlaylistScene>().ToTable(t => t.HasCheckConstraint("CK_PlaylistScene_Position", "[Position] > 0"));

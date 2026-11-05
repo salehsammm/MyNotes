@@ -21,13 +21,14 @@ public class PlaylistService(IDbContextFactory<AppDbContext> factory)
         return name;
     }
 
-    public async Task<Playlist> CreateAsync(string name)
+    public async Task<Playlist> CreateAsync(string name, string description = "")
     {
         name = ValidName(name);
+        if (description.Length > 10000) throw new InvalidOperationException("Keep playlist descriptions within 10,000 characters.");
         await using var db = await factory.CreateDbContextAsync();
         if (await db.Playlists.AnyAsync(p => p.Name == name))
             throw new InvalidOperationException("A playlist with this name already exists.");
-        var playlist = new Playlist { Name = name };
+        var playlist = new Playlist { Name = name, Description = description };
         db.Playlists.Add(playlist);
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException ex) when (IsDuplicate(ex))
@@ -47,6 +48,16 @@ public class PlaylistService(IDbContextFactory<AppDbContext> factory)
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException ex) when (IsDuplicate(ex))
         { throw new InvalidOperationException("A playlist with this name already exists."); }
+    }
+
+    public async Task SaveDescriptionAsync(int id, string description)
+    {
+        if (description.Length > 10000) throw new InvalidOperationException("Keep playlist descriptions within 10,000 characters.");
+        await using var db = await factory.CreateDbContextAsync();
+        var playlist = await db.Playlists.FindAsync(id)
+            ?? throw new InvalidOperationException("This playlist no longer exists.");
+        playlist.Description = description;
+        await db.SaveChangesAsync();
     }
 
     private static bool IsDuplicate(DbUpdateException ex) =>

@@ -1,0 +1,89 @@
+// Run with Playwright against a disposable host/database only; creates scene, performer and playlist fixtures.
+// Set MYNOTES_TEST_URL and MYNOTES_TEST_PASSWORD. Screenshots are written beside the script.
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+(async () => {
+ const base = process.env.MYNOTES_TEST_URL, password = process.env.MYNOTES_TEST_PASSWORD;
+ if (!base || !password) throw new Error('Set disposable test host URL and password.');
+ const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+ const errors = []; page.on('pageerror', e => errors.push(e.message));
+ const playlist = name => page.getByRole('region', { name, exact: true });
+ const field = (scope, label, control = 'input') => scope.locator('label').filter({ hasText: new RegExp('^' + label + '$') }).locator('..').locator(control);
+ async function saveDraft(keyboard = false) {
+  const revision = await page.locator('[data-save-version]').count() ? Number(await page.locator('[data-save-version]').getAttribute('data-save-version')) : 0;
+  if (keyboard) await page.keyboard.press('Control+s');
+  else await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await page.waitForFunction(previous => Number(document.querySelector('[data-save-version]')?.dataset.saveVersion || 0) > previous, revision);
+ }
+ try {
+  await page.goto(base + '/moviereview/playlists');
+  await page.locator('#password').fill(password); await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await page.getByLabel('Playlist name', { exact: true }).fill('Reading queue');
+  await page.getByLabel('Description (optional)', { exact: true }).fill('Queue explanation\nSecond line');
+  await page.getByRole('button', { name: 'Create playlist', exact: true }).click();
+  await playlist('Reading queue').waitFor();
+  assert.equal(await playlist('Reading queue').locator('.playlist-panel').evaluate(e => e.open), false);
+  await playlist('Reading queue').locator('.playlist-summary').click();
+  assert.equal(await playlist('Reading queue').locator('.playlist-description').innerText(), 'Queue explanation\nSecond line');
+  await playlist('Reading queue').getByRole('button', { name: 'Edit description', exact: true }).click();
+  await playlist('Reading queue').getByLabel('Playlist description', { exact: true }).fill('Updated explanation');
+  await playlist('Reading queue').getByRole('button', { name: 'Save description', exact: true }).click();
+  await playlist('Reading queue').getByText('Updated explanation', { exact: true }).waitFor();
+  assert.equal(await playlist('Reading queue').locator('.playlist-panel').evaluate(e => e.open), true);
+  await page.reload(); await playlist('Reading queue').waitFor();
+  assert.equal(await playlist('Reading queue').locator('.playlist-panel').evaluate(e => e.open), false);
+  await page.goto(base + '/moviereview/scenes/new'); await page.locator('#sceneTitle').fill('Editor fixture');
+  assert.equal(await page.getByRole('button', { name: 'New performer', exact: true }).isVisible(), true);
+  assert.equal(await field(page, 'Setup notes', 'textarea').isVisible(), true);
+  assert.equal(await field(page, 'Sex notes', 'textarea').isVisible(), true);
+  const ratings = page.locator('select').filter({ has: page.locator('option[value="Good"]') });
+  assert.equal(await ratings.count(), 3);
+  await page.getByRole('button', { name: /Add to playlist/ }).click();
+  await page.getByLabel('Reading queue', { exact: true }).check();
+  await page.getByLabel('New playlist name', { exact: true }).fill('Inline playlist');
+  await page.getByLabel('Playlist description (optional)', { exact: true }).fill('Created in the editor');
+  await page.getByRole('button', { name: 'Create and select', exact: true }).click();
+  await page.getByLabel('Inline playlist', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'New performer', exact: true }).click();
+  const modal = page.locator('.modal-content');
+  await field(modal, 'Name').fill('Profile fixture');
+  assert.equal(await field(modal, 'Face quality').isVisible(), true);
+  await field(modal, 'Face quality').fill('Expressive'); await field(modal, 'Body size').fill('Medium');
+  await field(modal, 'Body quality').fill('Athletic'); await field(modal, 'Belly quality').fill('Toned');
+  await field(modal, 'Leg quality').fill('Long'); await field(modal, 'Age category', 'select').selectOption('Milf');
+  await modal.getByRole('button', { name: 'Save and add', exact: true }).click(); await modal.waitFor({ state: 'detached' });
+  const extra = page.getByRole('complementary', { name: 'Extra details for Profile fixture', exact: true });
+  await extra.getByText('Expressive', { exact: true }).waitFor();
+  for (const value of ['Medium', 'Athletic', 'Toned', 'Long', 'MILF']) assert.equal(await extra.getByText(value, { exact: true }).isVisible(), true);
+  await field(page, 'Setup notes', 'textarea').fill('medium Medium, ,');
+  await field(page, 'Sex notes', 'textarea').fill(': , 😀 😀');
+  await saveDraft();
+  await page.waitForURL(/\/moviereview\/scenes\/\d+(?:\?saved=true)?$/); const editUrl = page.url();
+  await page.waitForFunction(title => document.querySelector('#sceneTitle')?.value === title, 'Editor fixture');
+  await page.locator('#sceneTitle').fill('Editor fixture updated');
+  await saveDraft();
+  assert.equal(page.url(), editUrl);
+  await page.reload(); await page.waitForFunction(title => document.querySelector('#sceneTitle')?.value === title, 'Editor fixture updated');
+  await page.locator('#sceneTitle').fill('Editor fixture keyboard'); await saveDraft(true); assert.equal(page.url(), editUrl);
+  await extra.screenshot({ path: __dirname + '/performer-extra.png' });
+  for (const rating of await ratings.all()) await rating.selectOption('Good');
+  await page.getByRole('button', { name: 'Complete review', exact: true }).click(); await page.waitForURL('**/export');
+  const output = await page.locator('#exportNote').inputValue();
+  assert.ok(output.includes('medium,')); assert.ok(!output.includes('medium Medium')); assert.ok(!output.includes(': ,')); assert.ok(!output.includes('😀 😀'));
+  await page.goto(editUrl); assert.equal(await field(page, 'Setup notes', 'textarea').inputValue(), 'medium Medium, ,');
+  await page.goto(base + '/moviereview/playlists'); await playlist('Inline playlist').waitFor();
+  assert.equal(await playlist('Inline playlist').locator('.playlist-panel').evaluate(e => e.open), false);
+  await playlist('Inline playlist').locator('.playlist-summary').click();
+  assert.equal(await playlist('Inline playlist').locator('.playlist-description').innerText(), 'Created in the editor');
+  await playlist('Inline playlist').getByRole('link', { name: 'Editor fixture keyboard', exact: true }).waitFor();
+  await page.screenshot({ path: __dirname + '/playlists-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: __dirname + '/playlists-mobile.png', fullPage: true });
+  assert.deepEqual(errors, []);
+  console.log('PASS: descriptions in both creation flows, editing, collapsed defaults, retained expansion, expanded editor/dialog, inline profile details, new/existing/keyboard draft saves, canonical URL, completion navigation, export cleanup, source preservation and mobile layout.');
+ } catch (e) { await page.screenshot({ path: __dirname + '/failure.png', fullPage: true }); console.error((await page.locator('body').innerText()).slice(-3500)); throw e; }
+ finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exit(1); });
