@@ -5,7 +5,7 @@ This module was brought from `F:\My.Prog\BookmarkCounter\BookmarkCounter\Bookmar
 ## Features and routes
 
 - `/` (with `/bookmarks` as an alias): live Edge bookmark count, recent checklist completions with a selectable time range (newest first), daily/weekly/one-time checklist, missed tasks, and question preview. Recently done defaults to the last 2 days; options range from 30 minutes to all time, and the browser remembers the selection. Completion dates and times are shown in local time. `/bookmarks/api/checklist/recent?minutes=2880` accepts a lookback in minutes (0 for all time; maximum 525600), defaulting to 2880.
-- `/bookmarks/history`: history chart, date range and manual count snapshot.
+- `/bookmarks/history`: history chart, date range and manual count snapshot. Minimum and maximum counts summarize the daily points shown in the selected 7-, 30-, or 90-day range and refresh when switching ranges or logging a count. Both show a dash while loading, for an empty range, or when loading fails.
 - `/bookmarks/questions`: questions and optional answers with completion status.
 - `/bookmarks/api/...`: original count, history, checklist and question endpoints under the module prefix.
 

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101416">
   <title>History · BookmarkCounter</title>
-  <link rel="stylesheet" href="/bookmarks/css/app.css?v=6">
-  <script src="/bookmarks/js/history.js?v=2" defer></script>
+  <link rel="stylesheet" href="/bookmarks/css/app.css?v=13">
+  <script src="/bookmarks/js/history.js?v=3" defer></script>
 </head>
 <body>
   <nav aria-label="MyNotes navigation" style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 5vw;background:#20262b;font:14px Segoe UI,sans-serif"><a href="/journal" style="color:#eee">MyNotes journal</a></nav>
@@ -28,6 +28,7 @@
       <div class="history-heading"><div><h1>Bookmark history</h1><p>See how your watch later list changes over time.</p></div><button class="primary-button" id="logButton" type="button">Log count now <span aria-hidden="true">↗</span></button></div>
       <section class="history-card" aria-label="Bookmark history chart">
         <div class="history-toolbar"><div><span class="chart-label">BOOKMARKS OVER TIME</span><div class="history-current" id="currentValue">—</div><div class="history-change" id="changeValue">Waiting for data</div></div><div class="range-control" role="group" aria-label="History range"><button type="button" data-days="7">7 days</button><button type="button" data-days="30" class="selected" aria-pressed="true">30 days</button><button type="button" data-days="90">90 days</button></div></div>
+        <dl class="history-extremes" aria-label="Counts in selected range" aria-live="polite"><div><dt>Minimum in range</dt><dd id="minimumValue">—</dd></div><div><dt>Maximum in range</dt><dd id="maximumValue">—</dd></div></dl>
         <div class="chart-wrap"><svg id="historyChart" role="img" aria-label="Bookmark count over time"></svg><div class="chart-message" id="chartMessage" role="status">Loading history…</div></div>
       </section>
       <p class="history-note">A lower count means your backlog is getting smaller. Counts are logged automatically every hour.</p>

@@ -178,6 +178,9 @@ h1,h2,h3,p{margin-top:0}
 .history-current{font-size:59px;font-weight:710;letter-spacing:-.065em;line-height:1.18;margin:5px 0 1px;font-variant-numeric:tabular-nums}
 .history-change{font-size:12px;color:var(--muted)}
 .history-change.good{color:var(--accent)}.history-change.bad{color:var(--danger)}
+.history-extremes{display:flex;flex-wrap:wrap;gap:16px 36px;margin:22px 0 0}
+.history-extremes dt{font-size:11px;color:var(--muted);margin-bottom:4px}
+.history-extremes dd{margin:0;font-size:24px;font-weight:650;color:var(--text);font-variant-numeric:tabular-nums}
 .range-control{display:flex;gap:3px;padding:4px;border:1px solid var(--line);background:#151b1c;border-radius:10px}
 .range-control button{border:0;background:transparent;color:var(--muted);font-size:11px;font-weight:620;padding:8px 11px;border-radius:7px;white-space:nowrap}
 .range-control button:hover{color:var(--text)}.range-control button.selected{background:#34413a;color:var(--accent)}

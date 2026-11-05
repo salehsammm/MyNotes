@@ -66,6 +66,8 @@ async function loadHistory() {
   const message = getElement('chartMessage');
   message.hidden = false;
   message.textContent = 'Loading history…';
+  getElement('minimumValue').textContent = '—';
+  getElement('maximumValue').textContent = '—';
   try {
     const response = await fetch(`/bookmarks/api/history?days=${selectedDays}`);
     if (!response.ok) throw new Error('Could not fetch history');
@@ -81,6 +83,8 @@ async function loadHistory() {
       return;
     }
     const first = data[0].count, last = data[data.length - 1].count, difference = last - first;
+    getElement('minimumValue').textContent = data.reduce((minimum, point) => Math.min(minimum, point.count), data[0].count).toLocaleString();
+    getElement('maximumValue').textContent = data.reduce((maximum, point) => Math.max(maximum, point.count), data[0].count).toLocaleString();
     getElement('currentValue').textContent = last.toLocaleString();
     getElement('changeValue').textContent = difference === 0 ? 'No change in this range' : `${difference > 0 ? '+' : '−'}${Math.abs(difference)} bookmarks in this range`;
     getElement('changeValue').className = `history-change${difference < 0 ? ' good' : difference > 0 ? ' bad' : ''}`;
