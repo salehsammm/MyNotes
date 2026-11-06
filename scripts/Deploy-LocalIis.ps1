@@ -13,8 +13,31 @@ if (Test-Path -LiteralPath $offlinePath) {
     throw 'The site is already offline. Resolve the existing deployment before continuing.'
 }
 
+# Regenerate compressed assets rather than reusing stale incremental outputs.
+if (Test-Path -LiteralPath $stagePath) {
+    $resolvedStage = (Resolve-Path -LiteralPath $stagePath).Path
+    if ($resolvedStage -ne [IO.Path]::GetFullPath((Join-Path $projectPath 'bin\Release\net9.0\publish'))) {
+        throw 'Unexpected publish staging path.'
+    }
+    Remove-Item -LiteralPath $resolvedStage -Recurse -Force
+}
+dotnet clean (Join-Path $projectPath 'MyNotes.csproj') -c Release -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'Release clean failed.' }
 dotnet publish (Join-Path $projectPath 'MyNotes.csproj') -c Release -o $stagePath
 if ($LASTEXITCODE -ne 0) { throw 'Release publish failed.' }
+
+# Static asset endpoints embed file lengths and hashes, including compressed files.
+# Reject an inconsistent publish before taking the running site offline.
+$assetManifest = Get-Content -LiteralPath (Join-Path $stagePath 'MyNotes.staticwebassets.endpoints.json') -Raw | ConvertFrom-Json
+$assetFiles = @($assetManifest.Endpoints.AssetFile | Sort-Object -Unique)
+foreach ($endpoint in $assetManifest.Endpoints) {
+    $assetPath = Join-Path (Join-Path $stagePath 'wwwroot') $endpoint.AssetFile
+    $expectedLength = ($endpoint.ResponseHeaders | Where-Object Name -eq 'Content-Length').Value
+    if (!(Test-Path -LiteralPath $assetPath) -or
+        ($expectedLength -and (Get-Item -LiteralPath $assetPath).Length -ne [long]$expectedLength)) {
+        throw "Published static asset does not match its manifest: $($endpoint.AssetFile)"
+    }
+}
 
 $configHashes = @{}
 foreach ($file in (Get-ChildItem -LiteralPath $sitePath -File | Where-Object Name -Like 'appsettings*.json')) {
@@ -44,9 +67,16 @@ if ((Get-FileHash -LiteralPath (Join-Path $stagePath 'MyNotes.dll')).Hash -ne
     (Get-FileHash -LiteralPath (Join-Path $sitePath 'MyNotes.dll')).Hash) {
     throw "Deployed assembly does not match staging. The site remains offline. Backup: $backupPath"
 }
+foreach ($asset in $assetFiles) {
+    $stagedAsset = Join-Path (Join-Path $stagePath 'wwwroot') $asset
+    $deployedAsset = Join-Path (Join-Path $sitePath 'wwwroot') $asset
+    if ((Get-FileHash -LiteralPath $stagedAsset).Hash -ne (Get-FileHash -LiteralPath $deployedAsset).Hash) {
+        throw "Deployed static asset mismatch: $asset. Site remains offline. Backup: $backupPath"
+    }
+}
 Remove-Item -LiteralPath $offlinePath -Force
 
-foreach ($route in @('/', '/journal', '/bookmarks/api/questions', '/bookmarks/js/dashboard.js?v=11')) {
+foreach ($route in @('/', '/journal', '/app.css', '/bookmarks/api/questions', '/bookmarks/js/dashboard.js?v=11')) {
     $response = $null
     for ($attempt = 0; $attempt -lt 10; $attempt++) {
         try {
