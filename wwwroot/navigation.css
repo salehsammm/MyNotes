@@ -1,6 +1,7 @@
 :root{--project-footer-height:44px}
 html{scroll-padding-top:155px;scroll-padding-bottom:60px}
 body{padding-bottom:calc(var(--project-footer-height) + env(safe-area-inset-bottom))}
+body:has(.journal-page){--project-footer-height:0px;padding-bottom:0}
 .project-header{position:sticky;top:0;z-index:100;background:#141b1e;border-bottom:1px solid #34413e;box-shadow:0 5px 20px #0002;isolation:isolate}
 .project-switcher{display:flex;align-items:center;gap:8px;min-height:54px;padding:8px max(20px,5vw);overflow-x:auto;white-space:nowrap;border-bottom:1px solid #34413e;font:600 13px/1.4 'Segoe UI',sans-serif;scrollbar-width:thin}
 .project-switcher a{display:block;padding:9px 14px;border:1px solid transparent;border-radius:8px;color:#b7c3bf;text-decoration:none;flex-shrink:0}

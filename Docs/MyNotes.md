@@ -2,6 +2,8 @@
 
 Frame Notes is the movie/TV journal module in the combined MyNotes host, built with .NET 9 Blazor Server, Entity Framework Core 9, and SQL Server. It lives at `/journal`. See the root `PROJECT.md` for shared hosting and the other modules.
 
+Journal pages omit the decorative footer label and its reserved bottom space.
+
 ## Run it
 
 1. Start the local SQL Server instance `.\MSSQLSERVER2` and ensure your Windows account can create a database there.

@@ -1,4 +1,4 @@
-/* The layout supplies the persistent footer for every journal page. */
+/* Hide legacy decorative footers on journal pages. */
 ::deep .shell > footer { display: none; }
 
 #blazor-error-ui {
