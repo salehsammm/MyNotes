@@ -2,13 +2,22 @@
 @using MovieReviews.Services
 @inject GuideService GuideService
 
-<div class="mt-1">
-    <button type="button" class="btn btn-link btn-sm px-0" @onclick="Toggle" aria-expanded="@(_open ? "true" : "false")">
-        @(_open ? "▾" : "▸") Shape vocabulary / راهنمای فرم
-    </button>
+<div>
+    <div class="shape-help-input">
+        @ChildContent
+        <button type="button" class="shape-help-button" @onclick="Toggle"
+                title="Shape vocabulary / راهنمای فرم" aria-label="Shape vocabulary / راهنمای فرم"
+                aria-expanded="@(_open ? "true" : "false")" aria-controls="@_panelId">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v6" />
+                <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
+            </svg>
+        </button>
+    </div>
     @if (_open)
     {
-        <div class="border rounded p-3 bg-light small">
+        <div id="@_panelId" class="border rounded p-3 bg-light small mt-1">
             <p class="mb-2">Use shape words in the quality or override field. Size is separate; <strong>soft</strong> describes texture, and <strong>pretty</strong> is an opinion.</p>
             <p class="mb-2">Example: <strong>rounded, fuller at the bottom</strong>. For افتاده, try <strong>lower-hanging</strong> or <strong>pendulous</strong>.</p>
             @if (_loading)
@@ -38,6 +47,9 @@
 </div>
 
 @code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private readonly string _panelId = $"shape-help-{Guid.NewGuid():N}";
     private bool _open;
     private bool _loading;
     private bool _loaded;

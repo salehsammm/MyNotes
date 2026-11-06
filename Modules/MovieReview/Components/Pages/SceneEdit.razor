@@ -320,10 +320,11 @@ else
                             </div>
                             <div class="col-md-6 mb-1">
                                 <label>Boobs override</label>
-                                <InputText @bind-Value="sp.BoobsOverride"
-                                           class="@OverrideInputClass(sp.BoobsOverride, boobsDefault)" />
+                                <BreastShapeHelp>
+                                    <InputText @bind-Value="sp.BoobsOverride"
+                                               class="@OverrideInputClass(sp.BoobsOverride, boobsDefault)" />
+                                </BreastShapeHelp>
                                 <small class="text-muted">default: @(boobsDefault ?? "—")</small>
-                                <BreastShapeHelp />
                             </div>
                             <div class="col-md-6 mb-1">
                                 <label>Ass override</label>
@@ -430,8 +431,9 @@ else
 
                     <div class="mb-2">
                         <label>Boobs quality</label>
-                        <input class="form-control" @bind="_editingPerformer.BoobsQuality" />
-                        <BreastShapeHelp />
+                        <BreastShapeHelp>
+                            <input class="form-control" @bind="_editingPerformer.BoobsQuality" />
+                        </BreastShapeHelp>
                     </div>
 
                     <div class="mb-2">
