@@ -56,11 +56,25 @@ public partial class PersonalNotes
 
     private void MarkDirty(ChangeEventArgs _) => dirty = true;
 
+    private static string DiaryTitle(DateOnly date) => $"Diary · {date:yyyy-MM-dd}";
+
+    private void ChangeNoteDate(DateOnly date)
+    {
+        var usesSuggestedTitle = form.Kind == PersonalNoteKind.Diary && form.Title == DiaryTitle(form.NoteDate);
+        form.NoteDate = date;
+        if (usesSuggestedTitle)
+        {
+            form.Title = DiaryTitle(date);
+            editContext.NotifyFieldChanged(FieldIdentifier.Create(() => form.Title));
+        }
+    }
+
     private Task RequestNew(PersonalNoteKind kind) => RequestChange(() =>
     {
         selectedId = null;
         error = message = null;
-        SetForm(new() { Kind = kind, NoteDate = Today, Title = kind == PersonalNoteKind.Diary ? $"Diary · {Today:yyyy-MM-dd}" : "", NoteGroupId = kind == PersonalNoteKind.Note && groupFilter > 0 ? groupFilter : null, Category = kind == PersonalNoteKind.Note && groupFilter > 0 ? groups.FirstOrDefault(g => g.Id == groupFilter)?.Category : null });
+        var date = Today;
+        SetForm(new() { Kind = kind, NoteDate = date, Title = kind == PersonalNoteKind.Diary ? DiaryTitle(date) : "", NoteGroupId = kind == PersonalNoteKind.Note && groupFilter > 0 ? groupFilter : null, Category = kind == PersonalNoteKind.Note && groupFilter > 0 ? groups.FirstOrDefault(g => g.Id == groupFilter)?.Category : null });
         return Task.CompletedTask;
     });
 
