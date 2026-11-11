@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Microsoft.JSInterop;
 using MyNotes.Data;
 
@@ -183,6 +184,13 @@ public partial class PersonalNotes
         if (form.IsLocked && !PrivateAccess.IsConfigured) { error = "Configure the Private area password before protecting notes."; return; }
         var note = selectedId is int id ? await VisibleNotes(db).Include(n => n.ResearchEntries).SingleOrDefaultAsync(n => n.Id == id) : new PersonalNote();
         if (note is null) { error = "This note no longer exists. Your writing is still here."; return; }
+        var diaryDateError = $"A diary entry already exists for {form.NoteDate:yyyy-MM-dd}.";
+        if (form.Kind == PersonalNoteKind.Diary && await db.PersonalNotes.AnyAsync(n =>
+            n.Kind == PersonalNoteKind.Diary && n.NoteDate == form.NoteDate && n.Id != note.Id))
+        {
+            error = diaryDateError;
+            return;
+        }
         var wasLocked = note.IsLocked;
         note.Title = form.Title.Trim();
         note.Kind = form.Kind;
@@ -200,7 +208,13 @@ public partial class PersonalNotes
         UpdateResearch(db, note);
         if (selectedId is null) db.PersonalNotes.Add(note);
         if (wasLocked && !await PrivateSessionIsLive()) { await RefreshAccess(); error = "Unlock locked notes before saving this entry."; return; }
-        await db.SaveChangesAsync();
+        try { await db.SaveChangesAsync(); }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 } sql &&
+            sql.Message.Contains(MediaDbContext.DiaryDateIndex, StringComparison.Ordinal))
+        {
+            error = diaryDateError;
+            return;
+        }
         selectedId = note.Id;
         selectedNoteLocked = note.IsLocked;
         form.Category = note.Category;

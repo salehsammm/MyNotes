@@ -4,6 +4,8 @@ namespace MyNotes.Data;
 
 public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContext(options)
 {
+    internal const string DiaryDateIndex = "UX_PersonalNotes_DiaryDate";
+
     public DbSet<MediaItem> MediaItems => Set<MediaItem>();
     public DbSet<Episode> Episodes => Set<Episode>();
     public DbSet<PersonalNote> PersonalNotes => Set<PersonalNote>();
@@ -40,6 +42,7 @@ public class MediaDbContext(DbContextOptions<MediaDbContext> options) : DbContex
             entity.HasOne(x => x.NoteGroup).WithMany(x => x.Notes)
                 .HasForeignKey(x => x.NoteGroupId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.NoteDate);
+            entity.HasIndex(x => x.NoteDate, DiaryDateIndex).IsUnique().HasFilter($"[Kind] = {(int)PersonalNoteKind.Diary}");
             entity.HasIndex(x => x.Category);
             entity.ToTable(t => t.HasCheckConstraint("CK_PersonalNotes_Kind", "[Kind] IN (1, 2)"));
         });

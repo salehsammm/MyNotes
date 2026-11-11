@@ -138,6 +138,10 @@ public class MediaDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("NoteGroupId");
 
+                b.HasIndex(new[] { "NoteDate" }, "UX_PersonalNotes_DiaryDate")
+                    .IsUnique()
+                    .HasFilter("[Kind] = 2");
+
                 b.ToTable("PersonalNotes", t =>
                     {
                         t.HasCheckConstraint("CK_PersonalNotes_Kind", "[Kind] IN (1, 2)");
