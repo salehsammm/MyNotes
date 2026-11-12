@@ -243,9 +243,12 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
-        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js?v=2");
-        await journalModule.InvokeVoidAsync("registerSaveShortcut", "media-form");
+        var module = await GetJournalModuleAsync();
+        await module.InvokeVoidAsync("registerSaveShortcut", "media-form");
     }
+
+    private async ValueTask<IJSObjectReference> GetJournalModuleAsync() =>
+        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", $"/{Assets["journal.js"]}");
 
     private void ResetEpisode()
     {
@@ -264,8 +267,8 @@
 
     private async Task OpenEpisode()
     {
-        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js?v=2");
-        await journalModule.InvokeVoidAsync("openEpisode", episodeDialog);
+        var module = await GetJournalModuleAsync();
+        await module.InvokeVoidAsync("openEpisode", episodeDialog);
     }
 
     private async Task CloseEpisode()

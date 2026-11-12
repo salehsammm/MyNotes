@@ -30,8 +30,8 @@ public partial class Home
             SeasonNumber = Math.Min(999, selectedItem.Episodes.Select(x => x.SeasonNumber).DefaultIfEmpty(0).Max() + 1)
         };
         seasonError = null;
-        journalModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "/journal.js");
-        await journalModule.InvokeVoidAsync("openEpisode", seasonDialog);
+        var module = await GetJournalModuleAsync();
+        await module.InvokeVoidAsync("openEpisode", seasonDialog);
     }
 
     private async Task CloseSeason()
