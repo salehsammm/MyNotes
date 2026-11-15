@@ -610,21 +610,14 @@ else
 
     private static string? FormatBj(Performer p, string? ov)
     {
-        var quality = p.BjQuality;
-        var tags = string.Join(", ", p.BjTags.Select(t => t.Name));
+        var description = string.Join(" ", new[]
+        {
+            string.IsNullOrWhiteSpace(ov) ? null : $"({ov.Trim()})",
+            p.BjQuality,
+            string.Join(", ", p.BjTags.Select(t => t.Name))
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
-        if (string.IsNullOrWhiteSpace(quality) && string.IsNullOrWhiteSpace(tags))
-            return null;
-
-        var inner = string.Join(" ", new[] { quality, tags }.Where(x => !string.IsNullOrWhiteSpace(x)));
-
-        string core;
-        if (!string.IsNullOrWhiteSpace(ov))
-            core = $"does ({ov.Trim()}) {inner} bj";
-        else
-            core = $"does {inner} bj";
-
-        return core + ",";
+        return description.Length == 0 ? null : $"does {description} bj,";
     }
 
     private static string? FormatMoans(Performer p, string? ov)

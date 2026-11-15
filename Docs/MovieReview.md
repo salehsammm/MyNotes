@@ -45,6 +45,8 @@ Run an import in a transaction and make it safe to rerun. Afterward, reconcile s
 
 ## Review export editing
 
+Scene-specific BJ overrides appear in the export even when the performer profile has no BJ quality or tags.
+
 After completing a review, the export page lets you edit the generated notepad text directly before copying it. These edits apply to the current copy only; use **Edit scene** to persist changes to the review fields. Text exports omit the scene URL and performer age and language flags, except **MILF**, which is included when selected. Setup ratings appear before setup flags and notes, with a blank line separating the opening summary from Setup. Performer blocks include face quality, body size/quality, and moans descriptions with the moans label (including override-only descriptions). Draft exports also include performer blocks.
 
 In the scene editor, **New performer** prefills the name from the current performer search text.
