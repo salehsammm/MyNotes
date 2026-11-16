@@ -13,9 +13,11 @@ The module reads the configured Edge Bookmarks JSON file and counts URL nodes re
 
 Recently done is a compact disclosure that starts closed on each page load. Open it to load completion history; automatic refreshes only fetch that history while it is open.
 
-Each Recently done entry has an Undo button. It reverses the final count increment for that exact occurrence (keeping earlier counts), clears its completion timestamp, and refreshes the checklist, missed tasks, and recent history. Past required occurrences return to Missed tasks; other occurrences can be viewed on their original date. The recent API includes `progressId` so Undo uses the existing progress decrement endpoint.
+Each Recently done entry has an Undo button. It reverses the final count increment for that exact occurrence (keeping earlier counts), clears its completion timestamp, and refreshes the checklist, missed tasks, and recent history. Past required occurrences with carryover enabled return to Missed tasks; other occurrences can be viewed on their original date. The recent API includes `progressId` so Undo uses the existing progress decrement endpoint.
 
-Missed tasks has a **Done all** action with confirmation. It completes all currently missed required occurrences to their target counts in one save, excluding optional tasks, future/current occurrences, and obsolete one-time schedules. Each completion appears in Recently done and can be reopened there.
+Missed tasks has a **Done all** action with confirmation. It completes all currently missed required occurrences to their target counts in one save, excluding optional tasks, tasks with carryover disabled, future/current occurrences, and obsolete one-time schedules. Each completion appears in Recently done and can be reopened there.
+
+**Carry over if missed** is on by default. Turn it off to keep a task required for the original daily or weekly goal while excluding its unfinished occurrences from Missed tasks and Done all. You can still view and complete an unfinished occurrence on its original date. Optional tasks never carry over.
 
 Task creation and editing include an optional icon (movie, music, bookmark, TV/series, book, check, star, or exercise) and a custom background color with a live preview. These settings belong to the task and appear on daily, weekly, one-time, missed, and recently completed occurrences. Choose None or turn off Use custom color to restore the defaults. Text contrast adapts to the background. The API accepts an allowed icon name or null and a six-digit hex background color or null.
 

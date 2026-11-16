@@ -309,7 +309,7 @@ function showForm(recurrence, item = null, row = null) {
   document.querySelectorAll('.item.hidden-for-edit').forEach(element => element.classList.remove('hidden-for-edit'));
   const form = document.createElement('form');
   form.className = 'item-form';
-  form.innerHTML = '<div><label for="itemTitle">Item</label><input id="itemTitle" name="title" type="text" maxlength="200" placeholder="e.g. Watch one saved video" required></div><div><label for="itemTarget">Goal</label><input id="itemTarget" name="target" type="number" min="1" max="999" required></div><label class="one-time-option"><input name="oneTime" type="checkbox"> One-time task</label><label class="one-time-option"><input name="optional" type="checkbox"> Optional task <small>(never appears in Missed tasks)</small></label><div class="repeat-field"><label for="repeatEveryDays">Repeat every (days)</label><input id="repeatEveryDays" name="repeatEveryDays" type="number" min="1" max="365" required></div><div class="first-due-field"><label for="firstDueDate">First due date</label><input id="firstDueDate" name="firstDueDate" type="date" required></div><div class="schedule-field" hidden><label for="scheduledDate">Scheduled date</label><input id="scheduledDate" name="scheduledDate" type="date"></div><p class="form-error" hidden></p><div class="form-actions"><button type="button" class="cancel">Cancel</button><button type="submit">Save item</button></div>';
+  form.innerHTML = '<div><label for="itemTitle">Item</label><input id="itemTitle" name="title" type="text" maxlength="200" placeholder="e.g. Watch one saved video" required></div><div><label for="itemTarget">Goal</label><input id="itemTarget" name="target" type="number" min="1" max="999" required></div><label class="one-time-option"><input name="oneTime" type="checkbox"> One-time task</label><label class="one-time-option"><input name="optional" type="checkbox"> Optional task <small>(never appears in Missed tasks)</small></label><label class="one-time-option"><input name="carryOverIfMissed" type="checkbox"> Carry over if missed <small>(show in Missed tasks after its day or week)</small></label><div class="repeat-field"><label for="repeatEveryDays">Repeat every (days)</label><input id="repeatEveryDays" name="repeatEveryDays" type="number" min="1" max="365" required></div><div class="first-due-field"><label for="firstDueDate">First due date</label><input id="firstDueDate" name="firstDueDate" type="date" required></div><div class="schedule-field" hidden><label for="scheduledDate">Scheduled date</label><input id="scheduledDate" name="scheduledDate" type="date"></div><p class="form-error" hidden></p><div class="form-actions"><button type="button" class="cancel">Cancel</button><button type="submit">Save item</button></div>';
   const title = form.elements.title;
   const appearance = document.createElement('div');
   appearance.className = 'task-appearance';
@@ -346,7 +346,13 @@ function showForm(recurrence, item = null, row = null) {
   const repeatEveryDays = form.elements.repeatEveryDays;
   const firstDueDate = form.elements.firstDueDate;
   oneTime.checked = item ? item.isOneTime : true;
-  form.elements.optional.checked = item?.isOptional || false;
+  const optional = form.elements.optional;
+  const carryOver = form.elements.carryOverIfMissed;
+  optional.checked = item?.isOptional || false;
+  carryOver.checked = item?.carryOverIfMissed ?? true;
+  const syncCarryOver = () => { carryOver.disabled = optional.checked; };
+  optional.addEventListener('change', syncCarryOver);
+  syncCarryOver();
   scheduledDate.value = item?.periodStart || dateKey(selectedDate);
   repeatEveryDays.value = item?.repeatEveryDays || 1;
   firstDueDate.value = item?.firstDueDate || dateKey(selectedDate);
@@ -378,7 +384,7 @@ function showForm(recurrence, item = null, row = null) {
     const submit = form.querySelector('[type=submit]');
     submit.disabled = true;
     try {
-      await request(item ? `/bookmarks/api/checklist/${item.id}` : '/bookmarks/api/checklist', { method: item ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: trimmed, recurrence, targetCount: goal, isOneTime: oneTime.checked, isOptional: form.elements.optional.checked, scheduledDate: oneTime.checked ? scheduledDate.value : null, repeatEveryDays: recurrence === 'Daily' && !oneTime.checked ? interval : 1, firstDueDate: recurrence === 'Daily' && !oneTime.checked ? firstDueDate.value : null, icon: form.elements.icon.value || null, backgroundColor: form.elements.customColor.checked ? form.elements.backgroundColor.value : null }) });
+      await request(item ? `/bookmarks/api/checklist/${item.id}` : '/bookmarks/api/checklist', { method: item ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: trimmed, recurrence, targetCount: goal, isOneTime: oneTime.checked, isOptional: optional.checked, carryOverIfMissed: carryOver.checked, scheduledDate: oneTime.checked ? scheduledDate.value : null, repeatEveryDays: recurrence === 'Daily' && !oneTime.checked ? interval : 1, firstDueDate: recurrence === 'Daily' && !oneTime.checked ? firstDueDate.value : null, icon: form.elements.icon.value || null, backgroundColor: form.elements.customColor.checked ? form.elements.backgroundColor.value : null }) });
       close();
       await loadChecklist();
       notify(item ? 'Item updated.' : oneTime.checked ? 'One-time task scheduled.' : 'Item added.');

@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
 
 		var ci = b.Entity<ChecklistItem>();
 		ci.Property(x => x.Title).HasMaxLength(200).IsRequired();
+		ci.Property(x => x.CarryOverIfMissed).HasDefaultValue(true);
 		ci.Property(x => x.Icon).HasMaxLength(20);
 		ci.Property(x => x.BackgroundColor).HasMaxLength(7);
 

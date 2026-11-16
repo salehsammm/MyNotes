@@ -11,6 +11,7 @@ public class ChecklistItem
 	public RecurrenceType Recurrence { get; set; }
 	public bool IsOneTime { get; set; }
 	public bool IsOptional { get; set; }
+	public bool CarryOverIfMissed { get; set; } = true;
 	public DateOnly? ScheduledPeriodStart { get; set; }
 	public int RepeatEveryDays { get; set; } = 1;
 	public DateOnly? FirstDueDate { get; set; }
